@@ -21,5 +21,18 @@ public class FakeApiTests
         var body = await response.Content.ReadAsStringAsync();
         body.Should().Be("RUNNING");
     }
+
+    [Test]
+    public async Task OrchestratorStatusCheck ()
+    {
+        var url = "/api/v1/store-orchestrator-status";
+        await using var app = new WebApplicationFactory<APIGateway.EntryPointMarker>();
+        var client = app.CreateClient();
+        var response = await client.GetAsync(url);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var body = await response.Content.ReadAsStringAsync();
+        body.Should().Be("RUNNING");
+    }
 }
 

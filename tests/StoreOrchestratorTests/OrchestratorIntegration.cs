@@ -51,7 +51,6 @@ public class OrchestratorIntegrationTests
     [Test]
     public async Task OrchestratorStatusCheck()
     {
-
         var publisher = _host.Services.GetRequiredService<IPublishEndpoint>();
 
         var msg = new Contracts.AskForOrchestratorStatus(Guid.NewGuid());
@@ -98,5 +97,6 @@ public class StatusProbe
             return instance;
         }
     }
-    public TaskCompletionSource<Contracts.SendOrchestratorStatus> taskCompletionSource = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    public readonly TaskCompletionSource<Contracts.SendOrchestratorStatus> taskCompletionSource = new(TaskCreationOptions.RunContinuationsAsynchronously);
 }

@@ -1,7 +1,7 @@
 #Go to project root
 cd ../../
 
-$SN = "StoreOrchestrator"
+$SN = "APIGateway"
 dotnet remove src/$SN/$SN.csproj package Azure.Messaging.ServiceBus
 dotnet remove src/$SN/$SN.csproj package MassTransit
 

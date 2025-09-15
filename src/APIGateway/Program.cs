@@ -1,3 +1,7 @@
+using MassTransit;
+using MassTransit.Testing;
+
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
@@ -5,6 +9,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddOpenApi();
 
 var app = builder.Build();
+
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
@@ -14,6 +19,27 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
+IHost massTransitHost = Host.CreateDefaultBuilder()
+
+            .ConfigureServices(services =>
+            {
+                services.AddMassTransitTestHarness(cfg =>
+                {
+                    cfg.AddConsumer<OrchestratorStatusConsumer>();
+
+                    //cfg.AddConsumer<TestSendStatusConsumer>(cfg =>
+                    //{
+                    //    cfg.UseConcurrentMessageLimit(1);
+                    //});
+
+                    cfg.UsingInMemory((context, bus) =>
+                    {
+                        bus.ConfigureEndpoints(context);
+                    });
+                });
+            })
+            .Build();
+
 var summaries = new[]
 {
     "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
@@ -22,6 +48,29 @@ var summaries = new[]
 app.MapGet("/api/v1/status", () =>
 {
     return "RUNNING";
+});
+
+app.MapGet("/api/v1/store-orchestrator-status", async () =>
+{
+    //Create consumer instance to listen for orchestrator-status events
+    OrchestratorStatusConsumer consumer = massTransitHost.Services.GetRequiredService<OrchestratorStatusConsumer>();
+    //send an orchestrator status request
+    var publisher = massTransitHost.Services.GetRequiredService<IPublishEndpoint>();
+    var msg = new Contracts.AskForOrchestratorStatus(Guid.NewGuid());
+    publisher.Publish(msg);
+    //fulfill the request on the first status message
+    //Contracts.SendOrchestratorStatus orchestratorStatusReceived = await consumer.taskCompletionSource.Task;
+    //TODO: configurable timeouts
+    var waitedForOrchestratorStatus = await Task.WhenAny(consumer.taskCompletionSource.Task, Task.Delay(TimeSpan.FromSeconds(5)));
+    if (consumer.taskCompletionSource.Task.IsCompletedSuccessfully)
+    {
+        Contracts.SendOrchestratorStatus status = await consumer.taskCompletionSource.Task;
+        return status.status;
+    }
+    else
+    {
+        return "TIMED_OUT";
+    }
 });
 
 app.MapGet("/weatherforecast", () =>
@@ -43,4 +92,14 @@ app.Run();
 record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
 {
     public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
+}
+
+public class OrchestratorStatusConsumer : MassTransit.IConsumer<Contracts.SendOrchestratorStatus>
+{
+
+    public readonly TaskCompletionSource<Contracts.SendOrchestratorStatus> taskCompletionSource = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    public Task Consume(ConsumeContext<Contracts.SendOrchestratorStatus> ctx)
+    {
+        return Task.CompletedTask;
+    }
 }
