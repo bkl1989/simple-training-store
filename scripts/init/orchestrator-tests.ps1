@@ -1,8 +1,13 @@
-mkdir tests
-dotnet new nunit -n ApiTests -o tests/ApiTests
-dotnet sln add tests/ApiTests/ApiTests.csproj
-dotnet add tests/ApiTests package FluentAssertions
-dotnet add tests/ApiTests package RestSharp
-dotnet add tests/ApiTests/ApiTests.csproj package Microsoft.AspNetCore.TestHost
-dotnet add tests/ApiTests/ApiTests.csproj package Microsoft.AspNetCore.Mvc.Testing
-dotnet add tests/ApiTests/ApiTests.csproj reference src/APIGateway/APIGateway.csproj
+#Go to project root
+cd ../../
+
+$TN = "StoreOrchestratorTests"
+$SN = "StoreOrchestrator"
+
+dotnet new nunit -n $TN -o tests/$TN
+dotnet sln add tests/$TN/$TN.csproj
+dotnet add tests/$TN package FluentAssertions
+dotnet add tests/$TN/$TN.csproj reference src/$SN/$SN.csproj
+
+#Go back to scripts directory
+cd scripts/teardown
