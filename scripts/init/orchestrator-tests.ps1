@@ -10,4 +10,4 @@ dotnet add tests/$TN package FluentAssertions
 dotnet add tests/$TN/$TN.csproj reference src/$SN/$SN.csproj
 
 #Go back to scripts directory
-cd scripts/teardown
+cd scripts/init
