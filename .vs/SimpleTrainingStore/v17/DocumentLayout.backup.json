@@ -3,24 +3,8 @@
   "WorkspaceRootPath": "C:\\Users\\bkl19\\workspace\\SeedForTrainingStore\\SimpleTrainingStore\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{60FB4FDC-5FDE-450E-BBF5-BF440A7787C2}|tests\\ApiTests\\ApiTests.csproj|c:\\users\\bkl19\\workspace\\seedfortrainingstore\\simpletrainingstore\\tests\\apitests\\apiintegration.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{60FB4FDC-5FDE-450E-BBF5-BF440A7787C2}|tests\\ApiTests\\ApiTests.csproj|solutionrelative:tests\\apitests\\apiintegration.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{8EC462FD-D22E-90A8-E5CE-7E832BA40C5D}|Solution Items{8EC462FD-D22E-90A8-E5CE-7E832BA40C5D}|C:\\Users\\bkl19\\workspace\\SeedForTrainingStore\\SimpleTrainingStore\\README.md||{EFC0BB08-EA7D-40C6-A696-C870411A895B}",
-      "RelativeMoniker": "D:0:0:{8EC462FD-D22E-90A8-E5CE-7E832BA40C5D}|Solution Items{8EC462FD-D22E-90A8-E5CE-7E832BA40C5D}|solutionrelative:README.md||{EFC0BB08-EA7D-40C6-A696-C870411A895B}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{69BE50F6-E8B7-4B04-8EF5-7CE3F0D9E935}|src\\APIGateway\\APIGateway.csproj|c:\\users\\bkl19\\workspace\\seedfortrainingstore\\simpletrainingstore\\src\\apigateway\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{69BE50F6-E8B7-4B04-8EF5-7CE3F0D9E935}|src\\APIGateway\\APIGateway.csproj|solutionrelative:src\\apigateway\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{60FB4FDC-5FDE-450E-BBF5-BF440A7787C2}|tests\\ApiTests\\ApiTests.csproj|c:\\users\\bkl19\\workspace\\seedfortrainingstore\\simpletrainingstore\\tests\\apitests\\apitests.csproj||{FA3CD31E-987B-443A-9B81-186104E8DAC1}|",
-      "RelativeMoniker": "D:0:0:{60FB4FDC-5FDE-450E-BBF5-BF440A7787C2}|tests\\ApiTests\\ApiTests.csproj|solutionrelative:tests\\apitests\\apitests.csproj||{FA3CD31E-987B-443A-9B81-186104E8DAC1}|"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{69BE50F6-E8B7-4B04-8EF5-7CE3F0D9E935}|src\\APIGateway\\APIGateway.csproj|c:\\users\\bkl19\\workspace\\seedfortrainingstore\\simpletrainingstore\\src\\apigateway\\entrypointmarker.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{69BE50F6-E8B7-4B04-8EF5-7CE3F0D9E935}|src\\APIGateway\\APIGateway.csproj|solutionrelative:src\\apigateway\\entrypointmarker.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+      "AbsoluteMoniker": "D:0:0:{2D49D3E0-2EBC-4B3F-AB82-63770C3DC60E}|src\\StoreOrchestrator\\StoreOrchestrator.csproj|c:\\users\\bkl19\\workspace\\seedfortrainingstore\\simpletrainingstore\\src\\storeorchestrator\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{2D49D3E0-2EBC-4B3F-AB82-63770C3DC60E}|src\\StoreOrchestrator\\StoreOrchestrator.csproj|solutionrelative:src\\storeorchestrator\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     }
   ],
   "DocumentGroupContainers": [
@@ -30,71 +14,23 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": 4,
+          "SelectedChildIndex": 1,
           "Children": [
             {
-              "$type": "Document",
-              "DocumentIndex": 1,
-              "Title": "README.md",
-              "DocumentMoniker": "C:\\Users\\bkl19\\workspace\\SeedForTrainingStore\\SimpleTrainingStore\\README.md",
-              "RelativeDocumentMoniker": "README.md",
-              "ToolTip": "C:\\Users\\bkl19\\workspace\\SeedForTrainingStore\\SimpleTrainingStore\\README.md",
-              "RelativeToolTip": "README.md",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001818|",
-              "WhenOpened": "2025-09-14T22:49:54.059Z",
-              "EditorCaption": ""
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 3,
-              "Title": "ApiTests",
-              "DocumentMoniker": "C:\\Users\\bkl19\\workspace\\SeedForTrainingStore\\SimpleTrainingStore\\tests\\ApiTests\\ApiTests.csproj",
-              "RelativeDocumentMoniker": "tests\\ApiTests\\ApiTests.csproj",
-              "ToolTip": "C:\\Users\\bkl19\\workspace\\SeedForTrainingStore\\SimpleTrainingStore\\tests\\ApiTests\\ApiTests.csproj",
-              "RelativeToolTip": "tests\\ApiTests\\ApiTests.csproj",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000758|",
-              "WhenOpened": "2025-09-14T22:39:30.991Z",
-              "EditorCaption": ""
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 4,
-              "Title": "EntryPointMarker.cs",
-              "DocumentMoniker": "C:\\Users\\bkl19\\workspace\\SeedForTrainingStore\\SimpleTrainingStore\\src\\APIGateway\\EntryPointMarker.cs",
-              "RelativeDocumentMoniker": "src\\APIGateway\\EntryPointMarker.cs",
-              "ToolTip": "C:\\Users\\bkl19\\workspace\\SeedForTrainingStore\\SimpleTrainingStore\\src\\APIGateway\\EntryPointMarker.cs",
-              "RelativeToolTip": "src\\APIGateway\\EntryPointMarker.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAcAAAAAAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-09-14T22:25:07.918Z",
-              "EditorCaption": ""
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 2,
-              "Title": "Program.cs",
-              "DocumentMoniker": "C:\\Users\\bkl19\\workspace\\SeedForTrainingStore\\SimpleTrainingStore\\src\\APIGateway\\Program.cs",
-              "RelativeDocumentMoniker": "src\\APIGateway\\Program.cs",
-              "ToolTip": "C:\\Users\\bkl19\\workspace\\SeedForTrainingStore\\SimpleTrainingStore\\src\\APIGateway\\Program.cs",
-              "RelativeToolTip": "src\\APIGateway\\Program.cs",
-              "ViewState": "AgIAAAwAAAAAAAAAAAAAABsAAAABAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-09-14T22:17:24.078Z",
-              "EditorCaption": ""
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{aa2115a1-9712-457b-9047-dbb71ca2cdd2}"
             },
             {
               "$type": "Document",
               "DocumentIndex": 0,
-              "Title": "APIIntegration.cs",
-              "DocumentMoniker": "C:\\Users\\bkl19\\workspace\\SeedForTrainingStore\\SimpleTrainingStore\\tests\\ApiTests\\APIIntegration.cs",
-              "RelativeDocumentMoniker": "tests\\ApiTests\\APIIntegration.cs",
-              "ToolTip": "C:\\Users\\bkl19\\workspace\\SeedForTrainingStore\\SimpleTrainingStore\\tests\\ApiTests\\APIIntegration.cs",
-              "RelativeToolTip": "tests\\ApiTests\\APIIntegration.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAABkAAAAAAAAAAAAAAA==",
+              "Title": "Program.cs",
+              "DocumentMoniker": "C:\\Users\\bkl19\\workspace\\SeedForTrainingStore\\SimpleTrainingStore\\src\\StoreOrchestrator\\Program.cs",
+              "RelativeDocumentMoniker": "src\\StoreOrchestrator\\Program.cs",
+              "ToolTip": "C:\\Users\\bkl19\\workspace\\SeedForTrainingStore\\SimpleTrainingStore\\src\\StoreOrchestrator\\Program.cs",
+              "RelativeToolTip": "src\\StoreOrchestrator\\Program.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAoAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-09-14T22:11:25.186Z",
+              "WhenOpened": "2025-09-15T00:29:02.622Z",
               "EditorCaption": ""
             }
           ]

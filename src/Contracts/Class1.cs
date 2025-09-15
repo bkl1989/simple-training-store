@@ -1,6 +1,4 @@
 ﻿namespace Contracts;
 
-public class Class1
-{
-
-}
+public record AskForOrchestratorStatus (Guid CorrelationId);
+public record SendOrchestratorStatus (Guid CorrelationId, string status);
