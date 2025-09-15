@@ -1,9 +1,6 @@
-﻿using System.Net;
-using FluentAssertions;
+﻿using FluentAssertions;
 using MassTransit;
 using MassTransit.Testing;
-//using MassTransit.Transports;
-using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 namespace OrchestratorIntegrationTests;
@@ -25,7 +22,10 @@ public class OrchestratorIntegrationTests
                 {
                     cfg.AddConsumer<AskStatusConsumer>();
 
-                    cfg.AddConsumer<TestSendStatusConsumer>();
+                    cfg.AddConsumer<TestSendStatusConsumer>(cfg =>
+                    {
+                        cfg.UseConcurrentMessageLimit(1);
+                    });
 
                     cfg.UsingInMemory((context, bus) =>
                     {
@@ -51,6 +51,7 @@ public class OrchestratorIntegrationTests
     [Test]
     public async Task OrchestratorStatusCheck()
     {
+
         var publisher = _host.Services.GetRequiredService<IPublishEndpoint>();
 
         var msg = new Contracts.AskForOrchestratorStatus(Guid.NewGuid());
@@ -61,21 +62,41 @@ public class OrchestratorIntegrationTests
         //Assert that the consumer of the AskForOrchestratorStatus message
         (await consumerHarness.Consumed.Any<Contracts.AskForOrchestratorStatus>()).Should().BeTrue();
 
-        //var probe = _host.Services.GetRequiredService<TestSendStatusConsumer>();
-
-        //var received = await Task.WhenAny(probe.Seen.Task, Task.Delay(TimeSpan.FromSeconds(5)));
-        ////Assert that the Store Orchestrator published its status
-        //received.Should().Be(probe.Seen.Task, "Sometime soon after we publish ask for orchestrator status, we should see a sendorchestrator status message");
+        Task received = await Task.WhenAny(StatusProbe.Instance.taskCompletionSource.Task, Task.Delay(TimeSpan.FromSeconds(5)));
+        //Assert that the Store Orchestrator published its status
+        StatusProbe.Instance.taskCompletionSource.Task.Status.Should().Be(TaskStatus.RanToCompletion);
     }
 }
 
 public class TestSendStatusConsumer : MassTransit.IConsumer<Contracts.SendOrchestratorStatus>
 {
-    public TaskCompletionSource<Contracts.SendOrchestratorStatus> Seen { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    public StatusProbe probe = StatusProbe.Instance;
     public Task Consume(ConsumeContext<Contracts.SendOrchestratorStatus> ctx)
     {
-        Seen.TrySetResult(ctx.Message);
+        probe.taskCompletionSource.TrySetResult(ctx.Message);
         return Task.CompletedTask;
+    }
+
+    public TestSendStatusConsumer ()
+    {
+
     }
 }
 
+//A singleton so that all testSendStatusConsumer instances complete one task
+public class StatusProbe
+{
+    private static StatusProbe instance = null;
+    public static StatusProbe Instance
+    {
+        get
+        {
+            if (instance == null)
+            {
+                instance = new StatusProbe();
+            }
+            return instance;
+        }
+    }
+    public TaskCompletionSource<Contracts.SendOrchestratorStatus> taskCompletionSource = new(TaskCreationOptions.RunContinuationsAsynchronously);
+}
