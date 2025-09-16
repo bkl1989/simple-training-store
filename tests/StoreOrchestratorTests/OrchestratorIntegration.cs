@@ -51,19 +51,30 @@ public class OrchestratorIntegrationTests
     [Test]
     public async Task OrchestratorStatusCheck()
     {
-        var publisher = _host.Services.GetRequiredService<IPublishEndpoint>();
+        // Resolve a typed request client instead of IPublishEndpoint
+        var client = _host.Services.GetRequiredService<
+            IRequestClient<Contracts.AskForOrchestratorStatus>>();
 
-        var msg = new Contracts.AskForOrchestratorStatus(Guid.NewGuid());
-        await publisher.Publish(msg);
+        var correlationId = Guid.NewGuid();
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
 
-        var consumerHarness = 
+        // Send request and await the typed response
+        var response = await client.GetResponse<Contracts.SendOrchestratorStatus>(
+            new Contracts.AskForOrchestratorStatus(correlationId), cts.Token);
+
+        // (Optional) keep your consumer assertion
+        var consumerHarness =
             _host.Services.GetRequiredService<IConsumerTestHarness<AskStatusConsumer>>();
-        //Assert that the consumer of the AskForOrchestratorStatus message
-        (await consumerHarness.Consumed.Any<Contracts.AskForOrchestratorStatus>()).Should().BeTrue();
+        (await consumerHarness.Consumed.Any<Contracts.AskForOrchestratorStatus>())
+            .Should().BeTrue("request should be consumed by AskStatusConsumer");
 
-        Task received = await Task.WhenAny(StatusProbe.Instance.taskCompletionSource.Task, Task.Delay(TimeSpan.FromSeconds(5)));
-        //Assert that the Store Orchestrator published its status
-        StatusProbe.Instance.taskCompletionSource.Task.Status.Should().Be(TaskStatus.RanToCompletion);
+        // Assert on the response payload (this proves the reply arrived)
+        response.Message.status.Should().Be("RUNNING");
+
+        // (Optional) Harness-level check: response is **sent**, not published
+        var harness = _host.Services.GetRequiredService<ITestHarness>();
+        (await harness.Sent.Any<Contracts.SendOrchestratorStatus>())
+            .Should().BeTrue("response should be sent back to the requester");
     }
 }
 

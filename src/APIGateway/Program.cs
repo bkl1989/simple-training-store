@@ -1,105 +1,89 @@
 using MassTransit;
-using MassTransit.Testing;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 
-
-var builder = WebApplication.CreateBuilder(args);
-
-// Add services to the container.
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
-builder.Services.AddOpenApi();
-
-var app = builder.Build();
-
-
-// Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
+namespace APIGateway
 {
-    app.MapOpenApi();
-}
+    public class Program
+    {
+        // ---- Entry point for production ----
+        public static async Task Main(string[] args)
+        {
+            var builder = CreateBuilder(args);
 
-app.UseHttpsRedirection();
+            // Default (prod) MassTransit wiring; tests can skip/replace this.
+            AddDefaultMassTransit(builder);
 
-IHost massTransitHost = Host.CreateDefaultBuilder()
+            var app = Build(builder);
+            await RunAsync(app);
+        }
 
-            .ConfigureServices(services =>
+        // ---- Test-friendly surface area ----
+
+        // 1) Create the builder (tests can call this, add/replace services, then Build)
+        public static WebApplicationBuilder CreateBuilder(string[] args)
+        {
+            var builder = WebApplication.CreateBuilder(args);
+
+            // Add services common to all environments
+            builder.Services.AddOpenApi();
+
+            return builder;
+        }
+
+        // 2) (Optional) Default MassTransit wiring, can be omitted in tests
+        public static void AddDefaultMassTransit(WebApplicationBuilder builder)
+        {
+            builder.Services.AddMassTransit(cfg =>
             {
-                services.AddMassTransitTestHarness(cfg =>
+                cfg.AddConsumer<OrchestratorStatusConsumer>();
+
+                cfg.UsingInMemory((context, bus) =>
                 {
-                    cfg.AddConsumer<OrchestratorStatusConsumer>();
-
-                    //cfg.AddConsumer<TestSendStatusConsumer>(cfg =>
-                    //{
-                    //    cfg.UseConcurrentMessageLimit(1);
-                    //});
-
-                    cfg.UsingInMemory((context, bus) =>
-                    {
-                        bus.ConfigureEndpoints(context);
-                    });
+                    bus.ConfigureEndpoints(context);
                 });
-            })
-            .Build();
+            });
+        }
 
-var summaries = new[]
-{
-    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-};
+        // 3) Build the app (maps middleware/endpoints)
+        public static WebApplication Build(WebApplicationBuilder builder)
+        {
+            var app = builder.Build();
 
-app.MapGet("/api/v1/status", () =>
-{
-    return "RUNNING";
-});
+            if (app.Environment.IsDevelopment())
+            {
+                app.MapOpenApi();
+            }
 
-app.MapGet("/api/v1/store-orchestrator-status", async () =>
-{
-    //Create consumer instance to listen for orchestrator-status events
-    OrchestratorStatusConsumer consumer = massTransitHost.Services.GetRequiredService<OrchestratorStatusConsumer>();
-    //send an orchestrator status request
-    var publisher = massTransitHost.Services.GetRequiredService<IPublishEndpoint>();
-    var msg = new Contracts.AskForOrchestratorStatus(Guid.NewGuid());
-    publisher.Publish(msg);
-    //fulfill the request on the first status message
-    //Contracts.SendOrchestratorStatus orchestratorStatusReceived = await consumer.taskCompletionSource.Task;
-    //TODO: configurable timeouts
-    var waitedForOrchestratorStatus = await Task.WhenAny(consumer.taskCompletionSource.Task, Task.Delay(TimeSpan.FromSeconds(5)));
-    if (consumer.taskCompletionSource.Task.IsCompletedSuccessfully)
-    {
-        Contracts.SendOrchestratorStatus status = await consumer.taskCompletionSource.Task;
-        return status.status;
+            app.UseHttpsRedirection();
+
+            app.MapGet("/api/v1/status", () => "RUNNING");
+
+            app.MapGet("/api/v1/store-orchestrator-status", async (IRequestClient<Contracts.AskForOrchestratorStatus> client) =>
+            {
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                var response = await client.GetResponse<Contracts.SendOrchestratorStatus>(
+                    new Contracts.AskForOrchestratorStatus(Guid.NewGuid()), cts.Token);
+                return response.Message.status;
+            });
+
+            return app;
+        }
+
+        // 4) Run (or StartAsync/StopAsync in tests)
+        public static Task RunAsync(WebApplication app) => app.RunAsync();
     }
-    else
+
+    public class OrchestratorStatusConsumer : IConsumer<Contracts.SendOrchestratorStatus>
     {
-        return "TIMED_OUT";
-    }
-});
+        public readonly TaskCompletionSource<Contracts.SendOrchestratorStatus> TaskCompletionSource =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-app.MapGet("/weatherforecast", () =>
-{
-    var forecast =  Enumerable.Range(1, 5).Select(index =>
-        new WeatherForecast
-        (
-            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-            Random.Shared.Next(-20, 55),
-            summaries[Random.Shared.Next(summaries.Length)]
-        ))
-        .ToArray();
-    return forecast;
-})
-.WithName("GetWeatherForecast");
-
-app.Run();
-
-record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
-{
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
-}
-
-public class OrchestratorStatusConsumer : MassTransit.IConsumer<Contracts.SendOrchestratorStatus>
-{
-
-    public readonly TaskCompletionSource<Contracts.SendOrchestratorStatus> taskCompletionSource = new(TaskCreationOptions.RunContinuationsAsynchronously);
-    public Task Consume(ConsumeContext<Contracts.SendOrchestratorStatus> ctx)
-    {
-        return Task.CompletedTask;
+        public Task Consume(ConsumeContext<Contracts.SendOrchestratorStatus> ctx)
+        {
+            TaskCompletionSource.TrySetResult(ctx.Message);
+            return Task.CompletedTask;
+        }
     }
 }

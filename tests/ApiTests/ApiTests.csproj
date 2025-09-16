@@ -26,6 +26,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\APIGateway\APIGateway.csproj" />
+    <ProjectReference Include="..\..\src\StoreOrchestrator\StoreOrchestrator.csproj" />
   </ItemGroup>
 
 </Project>

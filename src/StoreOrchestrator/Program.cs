@@ -21,11 +21,9 @@ host.Run();
 
 public class AskStatusConsumer : IConsumer<Contracts.AskForOrchestratorStatus>
 {
-    public Task Consume(ConsumeContext<Contracts.AskForOrchestratorStatus> context)
+    public async Task Consume(ConsumeContext<Contracts.AskForOrchestratorStatus> ctx)
     {
-        return context.Publish(new Contracts.SendOrchestratorStatus(
-            context.Message.CorrelationId,
-            "RUNNING"
-        ));
+        // compute status...
+        await ctx.RespondAsync(new Contracts.SendOrchestratorStatus(ctx.Message.CorrelationId, "RUNNING"));
     }
 }
