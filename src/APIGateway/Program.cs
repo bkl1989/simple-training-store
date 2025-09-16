@@ -1,3 +1,6 @@
+using System;
+using System.Threading;
+using System.Threading.Tasks;
 using MassTransit;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
@@ -25,19 +28,23 @@ namespace APIGateway
         public static WebApplicationBuilder CreateBuilder(string[] args)
         {
             var builder = WebApplication.CreateBuilder(args);
-
-            // Add services common to all environments
-            builder.Services.AddOpenApi();
-
+            builder.Services.AddOpenApi(); // OpenAPI for dev if you want it
             return builder;
         }
 
-        // 2) (Optional) Default MassTransit wiring, can be omitted in tests
+        // 2) Default MassTransit wiring (register request clients for all services)
         public static void AddDefaultMassTransit(WebApplicationBuilder builder)
         {
             builder.Services.AddMassTransit(cfg =>
             {
+                // Kept for compatibility with any test harness code that references it
                 cfg.AddConsumer<OrchestratorStatusConsumer>();
+
+                // Request clients for R/R
+                cfg.AddRequestClient<Contracts.AskForOrchestratorStatus>();
+                cfg.AddRequestClient<Contracts.AskForOrderServiceStatus>();
+                cfg.AddRequestClient<Contracts.AskForAuthServiceStatus>();
+                cfg.AddRequestClient<Contracts.AskForLearnerServiceStatus>();
 
                 cfg.UsingInMemory((context, bus) =>
                 {
@@ -46,7 +53,7 @@ namespace APIGateway
             });
         }
 
-        // 3) Build the app (maps middleware/endpoints)
+        // 3) Build the app (map endpoints)
         public static WebApplication Build(WebApplicationBuilder builder)
         {
             var app = builder.Build();
@@ -58,15 +65,48 @@ namespace APIGateway
 
             app.UseHttpsRedirection();
 
+            // Simple liveness
             app.MapGet("/api/v1/status", () => "RUNNING");
 
-            app.MapGet("/api/v1/store-orchestrator-status", async (IRequestClient<Contracts.AskForOrchestratorStatus> client) =>
-            {
-                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-                var response = await client.GetResponse<Contracts.SendOrchestratorStatus>(
-                    new Contracts.AskForOrchestratorStatus(Guid.NewGuid()), cts.Token);
-                return response.Message.status;
-            });
+            // Orchestrator status via request/response
+            app.MapGet("/api/v1/store-orchestrator-status",
+                async (IRequestClient<Contracts.AskForOrchestratorStatus> client) =>
+                {
+                    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                    var response = await client.GetResponse<Contracts.SendOrchestratorStatus>(
+                        new Contracts.AskForOrchestratorStatus(Guid.NewGuid()), cts.Token);
+                    return response.Message.status;
+                });
+
+            // Order service status via request/response
+            app.MapGet("/api/v1/order-service-status",
+                async (IRequestClient<Contracts.AskForOrderServiceStatus> client) =>
+                {
+                    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                    var response = await client.GetResponse<Contracts.SendOrderServiceStatus>(
+                        new Contracts.AskForOrderServiceStatus(Guid.NewGuid()), cts.Token);
+                    return response.Message.status;
+                });
+
+            // Auth service status via request/response
+            app.MapGet("/api/v1/auth-service-status",
+                async (IRequestClient<Contracts.AskForAuthServiceStatus> client) =>
+                {
+                    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                    var response = await client.GetResponse<Contracts.SendAuthServiceStatus>(
+                        new Contracts.AskForAuthServiceStatus(Guid.NewGuid()), cts.Token);
+                    return response.Message.status;
+                });
+
+            // Learner service status via request/response
+            app.MapGet("/api/v1/learner-service-status",
+                async (IRequestClient<Contracts.AskForLearnerServiceStatus> client) =>
+                {
+                    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                    var response = await client.GetResponse<Contracts.SendLearnerServiceStatus>(
+                        new Contracts.AskForLearnerServiceStatus(Guid.NewGuid()), cts.Token);
+                    return response.Message.status;
+                });
 
             return app;
         }
@@ -75,6 +115,7 @@ namespace APIGateway
         public static Task RunAsync(WebApplication app) => app.RunAsync();
     }
 
+    // Kept for compatibility with any test harness code that references it
     public class OrchestratorStatusConsumer : IConsumer<Contracts.SendOrchestratorStatus>
     {
         public readonly TaskCompletionSource<Contracts.SendOrchestratorStatus> TaskCompletionSource =

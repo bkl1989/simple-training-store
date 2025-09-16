@@ -1,7 +1,28 @@
-using Order;
+using MassTransit;
 
 var builder = Host.CreateApplicationBuilder(args);
-builder.Services.AddHostedService<Worker>();
+
+// Keep your worker (optional)
+builder.Services.AddHostedService<Order.Worker>();
+
+// MassTransit: respond to AskForOrderServiceStatus
+builder.Services.AddMassTransit(mt =>
+{
+    mt.SetKebabCaseEndpointNameFormatter();
+
+    mt.AddConsumer<AskOrderServiceStatusConsumer>();
+
+    mt.UsingInMemory((context, cfg) =>
+    {
+        cfg.ConfigureEndpoints(context);
+    });
+});
 
 var host = builder.Build();
 host.Run();
+
+public sealed class AskOrderServiceStatusConsumer : IConsumer<Contracts.AskForOrderServiceStatus>
+{
+    public Task Consume(ConsumeContext<Contracts.AskForOrderServiceStatus> ctx)
+        => ctx.RespondAsync(new Contracts.SendOrderServiceStatus(ctx.Message.CorrelationId, "RUNNING"));
+}

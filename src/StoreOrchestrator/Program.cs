@@ -8,7 +8,7 @@ builder.Services.AddMassTransit( mt =>
 {
     mt.SetKebabCaseEndpointNameFormatter();
 
-    mt.AddConsumer<AskStatusConsumer>();
+    mt.AddConsumer<AskStoreOrchestratorStatusConsumer>();
 
     mt.UsingInMemory((context, cfg) =>
     {
@@ -19,7 +19,7 @@ builder.Services.AddMassTransit( mt =>
 var host = builder.Build();
 host.Run();
 
-public class AskStatusConsumer : IConsumer<Contracts.AskForOrchestratorStatus>
+public class AskStoreOrchestratorStatusConsumer : IConsumer<Contracts.AskForOrchestratorStatus>
 {
     public async Task Consume(ConsumeContext<Contracts.AskForOrchestratorStatus> ctx)
     {

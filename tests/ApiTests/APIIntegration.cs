@@ -1,12 +1,16 @@
 using APIGateway;
+using Auth;
 using FluentAssertions;
+using Learner;
 using MassTransit;
 using MassTransit.Testing;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using NUnit.Framework;
-using StoreOrchestrator; // for AskStatusConsumer if it's defined there
+using Order;
+using StoreOrchestrator;
+using System;
 using System.Net;
 using System.Threading.Tasks;
 
@@ -14,23 +18,36 @@ namespace ApiTests;
 
 public class IntegrationTests
 {
-    private HttpClient apiClient = null!;
     private WebApplication apiApp = null!;
+    private HttpClient apiClient = null!;
+    private ITestHarness? _harness;
 
     [OneTimeSetUp]
     public async Task OneTimeSetUp()
     {
-        // Create the app builder and enable TestServer
-        var apiAppBuilder = Program.CreateBuilder([]);
+        // Build a single TestServer host that includes API + all responders (Option A)
+        var apiAppBuilder = Program.CreateBuilder(Array.Empty<string>());
 
         // IMPORTANT: Use TestServer so GetTestClient() works
         apiAppBuilder.WebHost.UseTestServer();
 
-        // Add one shared MassTransit test harness (consumers from both services)
+        // One shared MassTransit test harness (consumers/responders + request clients)
         apiAppBuilder.Services.AddMassTransitTestHarness(cfg =>
         {
-            cfg.AddConsumer<OrchestratorStatusConsumer>();
-            cfg.AddConsumer<AskStatusConsumer>(); // from StoreOrchestrator project
+            // Keep if needed by other tests
+            cfg.AddConsumer<APIGateway.OrchestratorStatusConsumer>();
+
+            // Responders from each microservice (brought into THIS host for the test)
+            cfg.AddConsumer<AskStoreOrchestratorStatusConsumer>();
+            cfg.AddConsumer<AskOrderServiceStatusConsumer>();
+            cfg.AddConsumer<AskAuthServiceStatusConsumer>();
+            cfg.AddConsumer<AskLearnerServiceStatusConsumer>();
+
+            // Request clients the API endpoints will resolve
+            cfg.AddRequestClient<Contracts.AskForOrchestratorStatus>();
+            cfg.AddRequestClient<Contracts.AskForOrderServiceStatus>();
+            cfg.AddRequestClient<Contracts.AskForAuthServiceStatus>();
+            cfg.AddRequestClient<Contracts.AskForLearnerServiceStatus>();
 
             cfg.UsingInMemory((context, bus) =>
             {
@@ -38,17 +55,13 @@ public class IntegrationTests
             });
         });
 
-        // Build the app via your Program.Build (maps endpoints, middleware, etc.)
         apiApp = Program.Build(apiAppBuilder);
-
         await apiApp.StartAsync();
 
-        // In-proc HttpClient to TestServer
-        apiClient = apiApp.GetTestClient();
+        _harness = apiApp.Services.GetRequiredService<ITestHarness>();
+        await _harness.Start();
 
-        // Optional: start the harness explicitly (host start usually does this)
-        // var harness = apiApp.Services.GetRequiredService<ITestHarness>();
-        // await harness.Start();
+        apiClient = apiApp.GetTestClient();
     }
 
     [Test]
@@ -71,12 +84,48 @@ public class IntegrationTests
         body.Should().Be("RUNNING");
     }
 
+    [Test]
+    public async Task OrderServiceStatusCheck()
+    {
+        var response = await apiClient.GetAsync("/api/v1/order-service-status");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var body = await response.Content.ReadAsStringAsync();
+        body.Should().Be("RUNNING");
+    }
+
+    [Test]
+    public async Task AuthServiceStatusCheck()
+    {
+        var response = await apiClient.GetAsync("/api/v1/auth-service-status");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var body = await response.Content.ReadAsStringAsync();
+        body.Should().Be("RUNNING");
+    }
+
+    [Test]
+    public async Task LearnerServiceStatusCheck()
+    {
+        var response = await apiClient.GetAsync("/api/v1/learner-service-status");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var body = await response.Content.ReadAsStringAsync();
+        body.Should().Be("RUNNING");
+    }
+
     [OneTimeTearDown]
     public async Task TearDown()
     {
-        apiClient.Dispose();
+        if (_harness is not null)
+            await _harness.Stop();
 
-        await apiApp.StopAsync();
-        await apiApp.DisposeAsync();
+        apiClient?.Dispose();
+
+        if (apiApp is not null)
+        {
+            await apiApp.StopAsync();
+            await apiApp.DisposeAsync();
+        }
     }
 }
