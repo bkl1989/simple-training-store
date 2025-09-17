@@ -8,12 +8,11 @@ var sql = builder.AddSqlServer("sql")
                  .WithDataVolume()
                  .AddDatabase("sqldata");
 
-// Wire projects (adjust names to match your solution).
-builder.AddProject<Projects.APIGateway>("apigateway")
-       .WithExternalHttpEndpoints();
-
-// If you have other services, add them too. Example:
-// builder.AddProject<Projects.Auth>("auth").WithReference(sql);
-// builder.AddProject<Projects.StoreOrchestrator>("storeorchestrator");
+// Wire projects
+builder.AddProject<Projects.APIGateway>("apigateway").WithExternalHttpEndpoints();
+builder.AddProject<Projects.Auth>("auth").WithReference(sql);
+builder.AddProject<Projects.StoreOrchestrator>("storeorchestrator");
+builder.AddProject<Projects.Order>("order");
+builder.AddProject<Projects.Learner>("learner");
 
 builder.Build().Run();
