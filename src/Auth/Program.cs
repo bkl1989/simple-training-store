@@ -1,83 +1,109 @@
 using Auth;
-using Google.Protobuf.WellKnownTypes;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using System;
 using System.Security.Cryptography;
+using System.Threading.Tasks;
 
-var builder = Host.CreateApplicationBuilder(args);
-builder.AddSqlServerDbContext<UserDBContext>("sqldata");
-
-// Keep your worker (optional)
-builder.Services.AddHostedService<Auth.Worker>();
-
-// MassTransit: respond to AskForAuthServiceStatus
-builder.Services.AddMassTransit(mt =>
+namespace Auth
 {
-    mt.SetKebabCaseEndpointNameFormatter();
-
-    mt.AddConsumer<AskAuthServiceStatusConsumer>();
-
-    mt.UsingRabbitMq((context, cfg) =>
+    public sealed class Program
     {
-        var cfgRoot = context.GetRequiredService<IConfiguration>();
-        var amqp = cfgRoot.GetConnectionString("rabbit");
-        cfg.Host(new Uri(amqp));
-        cfg.ConfigureEndpoints(context);
-    });
-});
-
-var host = builder.Build();
-
-if (host.Services.GetRequiredService<IHostEnvironment>().IsDevelopment())
-{
-    using (var scope = host.Services.CreateScope())
-    {
-        UserDBContext context = scope.ServiceProvider.GetRequiredService<UserDBContext>();
-
-        context.Database.EnsureCreated();
-
-        if (!await context.Users.AnyAsync())
+        public static async Task Main(string[] args)
         {
-            string password = "123Password";
+            var host = CreateHostBuilder(args).Build();
 
-            byte[] salt = RandomNumberGenerator.GetBytes(16);
+            if (host.Services.GetRequiredService<IHostEnvironment>().IsDevelopment())
+            {
+                await SeedDevelopmentDatabase(host);
+            }
 
-            // Derive a key from the password + salt using PBKDF2
-            using var pbkdf2 = new Rfc2898DeriveBytes(
-                password,
-                salt,
-                iterations: 100_000,
-                HashAlgorithmName.SHA256);
+            await host.RunAsync();
+        }
 
-            byte[] hash = pbkdf2.GetBytes(32);
+        public static IHostBuilder CreateHostBuilder(string[] args) =>
+            Host.CreateDefaultBuilder(args)
+                .ConfigureServices((context, services) =>
+                {
+                    // Register DbContext directly
+                    services.AddDbContext<UserDBContext>(options =>
+                        options.UseSqlServer(context.Configuration.GetConnectionString("sqldata")));
 
-            context.Users.AddRange(
-                new User { EmailAddress = "bkl1989@gmail.com", HashedPassword = hash }
-            );
 
-            await context.SaveChangesAsync();
+                    // Optional worker
+                    services.AddHostedService<Auth.Worker>();
+
+                    // MassTransit configuration
+                    services.AddMassTransit(mt =>
+                    {
+                        mt.SetKebabCaseEndpointNameFormatter();
+                        mt.AddConsumer<AskAuthServiceStatusConsumer>();
+
+                        mt.UsingRabbitMq((ctx, cfg) =>
+                        {
+                            var cfgRoot = ctx.GetRequiredService<IConfiguration>();
+                            var amqp = cfgRoot.GetConnectionString("rabbit");
+                            cfg.Host(new Uri(amqp));
+                            cfg.ConfigureEndpoints(ctx);
+                        });
+                    });
+                });
+
+        public static async Task SeedDevelopmentDatabase(IHost host)
+        {
+            await using var scope = host.Services.CreateAsyncScope();
+            var context = scope.ServiceProvider.GetRequiredService<UserDBContext>();
+
+            // Ensure schema exists. Use MigrateAsync() if you rely on EF migrations.
+            await context.Database.EnsureCreatedAsync();
+
+            if (!await context.Users.AnyAsync())
+            {
+                const string password = "123Password";
+
+                // Generate a salt
+                byte[] salt = RandomNumberGenerator.GetBytes(16);
+
+                // Derive a key from the password + salt using PBKDF2
+                using var pbkdf2 = new Rfc2898DeriveBytes(
+                    password,
+                    salt,
+                    iterations: 100_000,
+                    HashAlgorithmName.SHA256);
+
+                byte[] hash = pbkdf2.GetBytes(32);
+
+                context.Users.Add(new User
+                {
+                    EmailAddress = "bkl1989@gmail.com",
+                    HashedPassword = hash
+                    // Store salt if you need password validation later
+                });
+
+                await context.SaveChangesAsync();
+            }
         }
     }
-}
-else
-{
 
-}
-
-host.Run();
-
-public sealed class AskAuthServiceStatusConsumer : IConsumer<Contracts.AskForAuthServiceStatus>
-{
-    private readonly UserDBContext _db;
-
-    public AskAuthServiceStatusConsumer(UserDBContext db)
+    public sealed class AskAuthServiceStatusConsumer : IConsumer<Contracts.AskForAuthServiceStatus>
     {
-        _db = db;
+        private readonly UserDBContext _db;
+
+        public AskAuthServiceStatusConsumer(UserDBContext db)
+        {
+            _db = db;
+        }
+
+        public async Task Consume(ConsumeContext<Contracts.AskForAuthServiceStatus> ctx)
+        {
+            var user = await _db.Users.AsNoTracking().FirstOrDefaultAsync();
+            await ctx.RespondAsync(
+                new Contracts.SendAuthServiceStatus(ctx.Message.CorrelationId, "RUNNING")
+            );
+        }
     }
-    public async Task Consume(ConsumeContext<Contracts.AskForAuthServiceStatus> ctx)
-    {
-        //how do I get the host in this context?
-        var user = await _db.Users.AsNoTracking().FirstOrDefaultAsync();
-        await ctx.RespondAsync(new Contracts.SendAuthServiceStatus(ctx.Message.CorrelationId, "RUNNING"));
-    }
+
 }

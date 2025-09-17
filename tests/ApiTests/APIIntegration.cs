@@ -1,11 +1,15 @@
 using APIGateway;
 using Auth;
 using FluentAssertions;
+using k8s.KubeConfigModels;
 using Learner;
 using MassTransit;
 using MassTransit.Testing;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using NUnit.Framework;
 using Order;
@@ -13,6 +17,7 @@ using StoreOrchestrator;
 using System;
 using System.Net;
 using System.Threading.Tasks;
+using System.Linq; // <-- added
 
 namespace ApiTests;
 
@@ -26,7 +31,24 @@ public class IntegrationTests
     public async Task OneTimeSetUp()
     {
         // Build a single TestServer host that includes API + all responders (Option A)
-        var apiAppBuilder = Program.CreateBuilder(Array.Empty<string>());
+        var apiAppBuilder = APIGateway.Program.CreateBuilder(Array.Empty<string>());
+
+        // Keep one open connection for the lifetime of the test host
+        var conn = new SqliteConnection("DataSource=:memory:");
+        await conn.OpenAsync();
+
+        // Override the DbContext for tests
+        apiAppBuilder.WebHost.ConfigureServices(services =>
+        {
+            // Remove the app’s existing DbContextOptions<UserDBContext> (likely SQL Server)
+            var descriptor = services.SingleOrDefault(
+                d => d.ServiceType == typeof(DbContextOptions<UserDBContext>));
+            if (descriptor is not null)
+                services.Remove(descriptor);
+
+            // Add SQLite DbContext using the open connection
+            services.AddDbContext<UserDBContext>(options => options.UseSqlite(conn));
+        });
 
         // IMPORTANT: Use TestServer so GetTestClient() works
         apiAppBuilder.WebHost.UseTestServer();
@@ -34,16 +56,12 @@ public class IntegrationTests
         // One shared MassTransit test harness (consumers/responders + request clients)
         apiAppBuilder.Services.AddMassTransitTestHarness(cfg =>
         {
-            // Keep if needed by other tests
             cfg.AddConsumer<APIGateway.OrchestratorStatusConsumer>();
-
-            // Responders from each microservice (brought into THIS host for the test)
             cfg.AddConsumer<AskStoreOrchestratorStatusConsumer>();
             cfg.AddConsumer<AskOrderServiceStatusConsumer>();
             cfg.AddConsumer<AskAuthServiceStatusConsumer>();
             cfg.AddConsumer<AskLearnerServiceStatusConsumer>();
 
-            // Request clients the API endpoints will resolve
             cfg.AddRequestClient<Contracts.AskForOrchestratorStatus>();
             cfg.AddRequestClient<Contracts.AskForOrderServiceStatus>();
             cfg.AddRequestClient<Contracts.AskForAuthServiceStatus>();
@@ -55,8 +73,24 @@ public class IntegrationTests
             });
         });
 
-        apiApp = Program.Build(apiAppBuilder);
+        apiAppBuilder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["ConnectionStrings:sqldata"] = "Server=ignored;Database=ignored;"
+        });
+
+        apiApp = APIGateway.Program.Build(apiAppBuilder);
+
         await apiApp.StartAsync();
+
+        // Ensure schema using the SAME container the app uses
+        await using (var scope = apiApp.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<UserDBContext>();
+            await db.Database.EnsureCreatedAsync();
+        }
+
+        // Your dev seed now resolves UserDBContext from the app container
+        await Auth.Program.SeedDevelopmentDatabase(apiApp);
 
         _harness = apiApp.Services.GetRequiredService<ITestHarness>();
         await _harness.Start();
