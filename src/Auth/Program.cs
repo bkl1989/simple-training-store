@@ -17,8 +17,11 @@ builder.Services.AddMassTransit(mt =>
 
     mt.AddConsumer<AskAuthServiceStatusConsumer>();
 
-    mt.UsingInMemory((context, cfg) =>
+    mt.UsingRabbitMq((context, cfg) =>
     {
+        var cfgRoot = context.GetRequiredService<IConfiguration>();
+        var amqp = cfgRoot.GetConnectionString("rabbit");
+        cfg.Host(new Uri(amqp));
         cfg.ConfigureEndpoints(context);
     });
 });

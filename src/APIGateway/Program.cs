@@ -46,9 +46,12 @@ namespace APIGateway
                 cfg.AddRequestClient<Contracts.AskForAuthServiceStatus>();
                 cfg.AddRequestClient<Contracts.AskForLearnerServiceStatus>();
 
-                cfg.UsingInMemory((context, bus) =>
+                cfg.UsingRabbitMq((context, cfg) =>
                 {
-                    bus.ConfigureEndpoints(context);
+                    var cfgRoot = context.GetRequiredService<IConfiguration>();
+                    var amqp = cfgRoot.GetConnectionString("rabbit");
+                    cfg.Host(new Uri(amqp));
+                    cfg.ConfigureEndpoints(context);
                 });
             });
         }
