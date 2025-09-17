@@ -1,6 +1,8 @@
+using Auth;
 using MassTransit;
 
 var builder = Host.CreateApplicationBuilder(args);
+builder.AddSqlServerDbContext<UserDBContext>("sqldata");
 
 // Keep your worker (optional)
 builder.Services.AddHostedService<Auth.Worker>();
@@ -18,7 +20,30 @@ builder.Services.AddMassTransit(mt =>
     });
 });
 
+var sql = builder.AddSqlServer("sql")
+                 .AddDatabase("sqldata");
+
+//builder.AddProject<Projects.AspireSQLEFCore>("aspiresql")
+//       .WithReference(sql)
+//       .WaitFor(sql);
+
+builder.Build().Run();
+
 var host = builder.Build();
+
+if (host.Services.GetRequiredService<IHostEnvironment>().IsDevelopment())
+{
+    using (var scope = host.Services.CreateScope())
+    {
+        var context = scope.ServiceProvider.GetRequiredService<UserDBContext>();
+        context.Database.EnsureCreated();
+    }
+}
+else
+{
+
+}
+
 host.Run();
 
 public sealed class AskAuthServiceStatusConsumer : IConsumer<Contracts.AskForAuthServiceStatus>
