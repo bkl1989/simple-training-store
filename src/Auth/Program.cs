@@ -16,6 +16,13 @@ namespace Auth
         {
             var host = CreateHostBuilder(args).Build();
 
+            await using var scope = host.Services.CreateAsyncScope();
+            var context = scope.ServiceProvider.GetRequiredService<UserDBContext>();
+
+            // Ensure schema exists. Use MigrateAsync() if you rely on EF migrations.
+            await context.Database.CanConnectAsync();
+            //TODO: handle error
+
             if (host.Services.GetRequiredService<IHostEnvironment>().IsDevelopment())
             {
                 await SeedDevelopmentDatabase(host);
@@ -30,7 +37,13 @@ namespace Auth
                 {
                     // Register DbContext directly
                     services.AddDbContext<UserDBContext>(options =>
-                        options.UseSqlServer(context.Configuration.GetConnectionString("sqldata")));
+                        options.UseSqlServer(context.Configuration.GetConnectionString("sqldata"),
+                            sqlServerOptionsAction: sqlOptions =>
+                            {
+                                sqlOptions.EnableRetryOnFailure();
+                            }
+                        )
+                    );
 
 
                     // Optional worker
