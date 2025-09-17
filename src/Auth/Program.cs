@@ -26,11 +26,6 @@ builder.Services.AddMassTransit(mt =>
     });
 });
 
-builder.Services.AddDbContext<UserDBContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("sqldata")));
-
-builder.Build().Run();
-
 var host = builder.Build();
 
 if (host.Services.GetRequiredService<IHostEnvironment>().IsDevelopment())
