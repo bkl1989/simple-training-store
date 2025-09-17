@@ -1,5 +1,6 @@
 using Auth;
 using MassTransit;
+using Microsoft.EntityFrameworkCore;
 
 var builder = Host.CreateApplicationBuilder(args);
 builder.AddSqlServerDbContext<UserDBContext>("sqldata");
@@ -20,12 +21,8 @@ builder.Services.AddMassTransit(mt =>
     });
 });
 
-var sql = builder.AddSqlServer("sql")
-                 .AddDatabase("sqldata");
-
-//builder.AddProject<Projects.AspireSQLEFCore>("aspiresql")
-//       .WithReference(sql)
-//       .WaitFor(sql);
+builder.Services.AddDbContext<UserDBContext>(options =>
+    options.UseSqlServer(builder.Configuration.GetConnectionString("sqldata")));
 
 builder.Build().Run();
 
