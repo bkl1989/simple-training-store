@@ -10,13 +10,16 @@ namespace Auth
 {
     public sealed class AuthUser
     {
+        [Key]
         public int Id { get; set; }
         [Required]
-        public string EmailAddress { get; set; } = string.Empty;
+        public string EmailAddress { get; set; }
         [Required]
         public byte [] HashedPassword { get; set; } = [];
-
+        [Required]
         public byte[] Salt { get; set; } = [];
+        [Required]
+        public Guid AggregateId { get; set; }
     }
 
     public class MyDbContext : DbContext

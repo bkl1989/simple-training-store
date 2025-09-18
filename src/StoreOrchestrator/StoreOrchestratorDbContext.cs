@@ -9,8 +9,9 @@ namespace StoreOrchestrator
     using Microsoft.EntityFrameworkCore;
     using System.Reflection.Metadata;
 
-    public class StoreOrchestratorUserDbContext(DbContextOptions<StoreOrchestratorUserDbContext> options) : DbContext(options)
+    public class StoreOrchestratorDbContext(DbContextOptions<StoreOrchestratorDbContext> options) : DbContext(options)
     {
         public DbSet<StoreOrchestratorUser> StoreOrchestratorUsers => Set<StoreOrchestratorUser>();
+        public DbSet<CreateUserSaga> CreateUserSagas => Set<CreateUserSaga>();
     }
 }

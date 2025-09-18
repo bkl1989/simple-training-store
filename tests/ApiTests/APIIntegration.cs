@@ -20,6 +20,7 @@ using System.Linq; // <-- added
 using System.Net;
 using System.Threading.Tasks;
 using System.Text;
+using Newtonsoft.Json.Linq;
 
 namespace ApiTests;
 
@@ -64,7 +65,7 @@ public class IntegrationTests
         {
             // Add SQLite DbContext using the open connection
             services.AddDbContext<Auth.AuthUserDbContext>(options => options.UseSqlite(authConn));
-            services.AddDbContext<StoreOrchestrator.StoreOrchestratorUserDbContext>(options => options.UseSqlite(orchestratorConn));
+            services.AddDbContext<StoreOrchestrator.StoreOrchestratorDbContext>(options => options.UseSqlite(orchestratorConn));
             services.AddDbContext<Order.OrderUserDbContext>(options => options.UseSqlite(orderConn));
             services.AddDbContext<Learner.LearnerUserDbContext>(options => options.UseSqlite(learnerConn));
         });
@@ -77,6 +78,8 @@ public class IntegrationTests
         {
             cfg.AddConsumer<APIGateway.OrchestratorStatusConsumer>();
             cfg.AddConsumer<AskStoreOrchestratorStatusConsumer>();
+            cfg.AddConsumer<CreateUserConsumer>();
+            cfg.AddConsumer<CreateAuthUserConsumer>();
             cfg.AddConsumer<AskOrderServiceStatusConsumer>();
             cfg.AddConsumer<AskAuthServiceStatusConsumer>();
             cfg.AddConsumer<AskLearnerServiceStatusConsumer>();
@@ -111,7 +114,7 @@ public class IntegrationTests
 
         await using (var scope = apiApp.Services.CreateAsyncScope())
         {
-            var db = scope.ServiceProvider.GetRequiredService<StoreOrchestrator.StoreOrchestratorUserDbContext>();
+            var db = scope.ServiceProvider.GetRequiredService<StoreOrchestrator.StoreOrchestratorDbContext>();
             await db.Database.EnsureCreatedAsync();
         }
 
@@ -192,7 +195,13 @@ public class IntegrationTests
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
         var body = await response.Content.ReadAsStringAsync();
-        body.Should().Be("RUNNING");
+        //TODO: handle sad path
+        var bodyJson = JsonConvert.DeserializeObject<JObject>(body);
+        //check that bodyJson.aggregateId is set
+        var message = bodyJson!["message"];
+        message.Should().NotBeNull();
+        var IdToken = message!["aggregateId"]?.Value<string>();
+        IdToken.Should().NotBeNullOrWhiteSpace();
     }
 
     [Test]

@@ -1,6 +1,7 @@
 using Aspire.Hosting;
 
 var builder = DistributedApplication.CreateBuilder(args);
+// Add Azure Key Vault resource
 
 // Declare resources you want Aspire to orchestrate for local dev.
 // (Example SQL resource shown; remove if not needed today.)

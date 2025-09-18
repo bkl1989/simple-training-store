@@ -1,12 +1,17 @@
 using Auth;
+using Contracts;
+using k8s.KubeConfigModels;
 using MassTransit;
+using Microsoft.AspNetCore.DataProtection.AuthenticatedEncryption.ConfigurationModel;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using System;
+using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Threading.Tasks;
+using static System.Net.WebRequestMethods;
 
 namespace Auth
 {
@@ -88,11 +93,14 @@ namespace Auth
 
                 byte[] hash = pbkdf2.GetBytes(32);
 
+                Guid aggregateId = Guid.Empty;
+
                 context.AuthUsers.Add(new AuthUser
                 {
                     EmailAddress = "bkl1989@gmail.com",
                     HashedPassword = hash,
-                    Salt = salt
+                    Salt = salt,
+                    AggregateId = aggregateId
                 });
 
                 await context.SaveChangesAsync();
@@ -118,4 +126,41 @@ namespace Auth
         }
     }
 
+    public sealed class CreateAuthUserConsumer : IConsumer<Contracts.CreateAuthUser>
+    {
+        private readonly AuthUserDbContext _db;
+
+        public CreateAuthUserConsumer(AuthUserDbContext db)
+        {
+            _db = db;
+        }
+
+        public async Task Consume(ConsumeContext<Contracts.CreateAuthUser> ctx)
+        {
+            //TODO: consolidate hashing code
+
+            // Generate a salt
+            byte[] salt = RandomNumberGenerator.GetBytes(16);
+
+            // Derive a key from the password + salt using PBKDF2
+            using var pbkdf2 = new Rfc2898DeriveBytes(
+                ctx.Message.password,
+                salt,
+                iterations: 100_000,
+                HashAlgorithmName.SHA256);
+
+            byte[] hash = pbkdf2.GetBytes(32);
+
+            var user = new AuthUser
+            {
+                EmailAddress = ctx.Message.email,
+                HashedPassword = hash,
+                Salt = salt
+            };
+
+            await ctx.RespondAsync(
+                new Contracts.AuthUserCreated(ctx.Message.CorrelationId)
+            );
+        }
+    }
 }

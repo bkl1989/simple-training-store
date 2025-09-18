@@ -15,3 +15,13 @@ public record SendAuthServiceStatus(Guid CorrelationId, string status);
 // Learner
 public record AskForLearnerServiceStatus(Guid CorrelationId);
 public record SendLearnerServiceStatus(Guid CorrelationId, string status);
+
+// Create User
+
+public record CreateUser(Guid CorrelationId, string firstName, string lastName, string email, string password);
+
+public record CreateUserSagaStarted (Guid CorrelationId, Guid AggregateId, string firstName, string lastName, string email);
+
+public record CreateAuthUser(Guid CorrelationId, string email, string password, Guid aggregateId);
+
+public record AuthUserCreated(Guid CorrelationId);

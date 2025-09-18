@@ -54,6 +54,8 @@ namespace APIGateway
                 cfg.AddRequestClient<Contracts.AskForOrderServiceStatus>();
                 cfg.AddRequestClient<Contracts.AskForAuthServiceStatus>();
                 cfg.AddRequestClient<Contracts.AskForLearnerServiceStatus>();
+                cfg.AddRequestClient<Contracts.CreateUser>();
+                cfg.AddRequestClient<Contracts.CreateUserSagaStarted>();
 
                 cfg.UsingRabbitMq((context, cfg) =>
                 {
@@ -120,22 +122,20 @@ namespace APIGateway
                     return response.Message.status;
                 });
 
-            /*
-             *app.MapPost("/create", async (HttpContext context) =>
-{
-    var requestBody = await new StreamReader(context.Request.Body).ReadToEndAsync();
-    return Results.Ok($"Received JSON: {requestBody}");
-});
-             */
-
             app.MapPost("/api/v1/users",
-            async (CreateUserDTO user) =>
+            async (CreateUserDTO user, IRequestClient<Contracts.CreateUser> client, CancellationToken ct) =>
             {
-                return Results.Ok($"Received user: {user.EmailAddress}");
-                //using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-                //var response = await client.GetResponse<Contracts.SendLearnerServiceStatus>(
-                //    new Contracts.AskForLearnerServiceStatus(Guid.NewGuid()), cts.Token);
-                //return response.Message.status;
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                var response = await client.GetResponse<Contracts.CreateUserSagaStarted>(
+                    new Contracts.CreateUser(
+                        Guid.NewGuid(),
+                        user.FirstName,
+                        user.LastName,
+                        user.EmailAddress,
+                        user.Password
+                    ), cts.Token);
+
+                return Results.Ok(response);
             });
 
             return app;

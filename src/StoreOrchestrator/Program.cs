@@ -9,6 +9,7 @@ using Microsoft.Extensions.Hosting;
 using System;
 using System.Security.Cryptography;
 using System.Threading.Tasks;
+using static MassTransit.MessageHeaders;
 
 namespace StoreOrchestrator
 {
@@ -19,7 +20,7 @@ namespace StoreOrchestrator
             var host = CreateBuilder(args).Build();
 
             await using var scope = host.Services.CreateAsyncScope();
-            var context = scope.ServiceProvider.GetRequiredService<StoreOrchestratorUserDbContext>();
+            var context = scope.ServiceProvider.GetRequiredService<StoreOrchestratorDbContext>();
 
             await context.Database.CanConnectAsync();
 
@@ -34,7 +35,7 @@ namespace StoreOrchestrator
         public static async Task SeedDevelopmentDatabase(IHost host)
         {
             await using var scope = host.Services.CreateAsyncScope();
-            var context = scope.ServiceProvider.GetRequiredService<StoreOrchestratorUserDbContext>();
+            var context = scope.ServiceProvider.GetRequiredService<StoreOrchestratorDbContext>();
 
             // Ensure schema exists. Use MigrateAsync() if you rely on EF migrations.
             await context.Database.EnsureCreatedAsync();
@@ -57,12 +58,13 @@ namespace StoreOrchestrator
         //TODO: is this the correct form, rather than IHostBuilder, for similar instances?
         public static IHostBuilder CreateBuilder (string[]args)
         {
-            var builder = Host.CreateDefaultBuilder(args).ConfigureServices((context, services) =>
+            //TODO: using host
+            var builder = Microsoft.Extensions.Hosting.Host.CreateDefaultBuilder(args).ConfigureServices((context, services) =>
             {
                 services.AddHostedService<Worker>();
 
                 // Register DbContext directly
-                services.AddDbContext<StoreOrchestratorUserDbContext>(options =>
+                services.AddDbContext<StoreOrchestratorDbContext>(options =>
                     options.UseSqlServer(context.Configuration.GetConnectionString("StoreOrchestratorDatabase"),
                         sqlServerOptionsAction: sqlOptions =>
                         {
@@ -76,6 +78,9 @@ namespace StoreOrchestrator
                     mt.SetKebabCaseEndpointNameFormatter();
 
                     mt.AddConsumer<AskStoreOrchestratorStatusConsumer>();
+                    mt.AddConsumer<CreateUserConsumer>();
+                    mt.AddRequestClient<Contracts.CreateAuthUser>();
+                    mt.AddRequestClient<Contracts.AuthUserCreated>();
 
                     mt.UsingRabbitMq((context, cfg) =>
                     {
@@ -93,9 +98,9 @@ namespace StoreOrchestrator
 
     public class AskStoreOrchestratorStatusConsumer : IConsumer<Contracts.AskForOrchestratorStatus>
     {
-        private readonly StoreOrchestratorUserDbContext _db;
+        private readonly StoreOrchestratorDbContext _db;
 
-        public AskStoreOrchestratorStatusConsumer(StoreOrchestratorUserDbContext db)
+        public AskStoreOrchestratorStatusConsumer(StoreOrchestratorDbContext db)
         {
             _db = db;
         }
@@ -105,6 +110,55 @@ namespace StoreOrchestrator
             //TODO: verify the contents
             var user = await _db.StoreOrchestratorUsers.AsNoTracking().FirstOrDefaultAsync();
             await ctx.RespondAsync(new Contracts.SendOrchestratorStatus(ctx.Message.CorrelationId, "RUNNING"));
+        }
+    }
+
+    public class CreateUserConsumer : IConsumer<Contracts.CreateUser>
+    {
+        private readonly StoreOrchestratorDbContext _db;
+        private readonly IRequestClient<Contracts.CreateAuthUser> _authUserRequestClient;
+
+        public CreateUserConsumer(StoreOrchestratorDbContext db, IRequestClient<Contracts.CreateAuthUser> authUserRequestClient)
+        {
+            _db = db;
+            _authUserRequestClient = authUserRequestClient;
+        }
+        public async Task Consume(ConsumeContext<Contracts.CreateUser> ctx)
+        {
+
+            // Ensure schema exists. Use MigrateAsync() if you rely on EF migrations.
+            await _db.Database.EnsureCreatedAsync();
+            var anyUsers = await _db.StoreOrchestratorUsers.AnyAsync();
+
+            var createdSaga = new CreateUserSaga {
+                correlationId = Guid.NewGuid(),
+                aggregateId = Guid.NewGuid(),
+            };
+
+            // TODO: handle sad path
+            await _db.CreateUserSagas.AddAsync(createdSaga);
+
+            await ctx.RespondAsync(new Contracts.CreateUserSagaStarted(
+                createdSaga.correlationId,
+                createdSaga.aggregateId,
+                ctx.Message.firstName,
+                ctx.Message.lastName,
+                ctx.Message.email
+            ));
+
+            //TODO: cancellation token
+            var response = await _authUserRequestClient.GetResponse<Contracts.CreateAuthUser>(
+                    new Contracts.CreateAuthUser(
+                        createdSaga.correlationId,
+                        ctx.Message.email,
+                        ctx.Message.password,
+                        createdSaga.aggregateId
+                    ));
+
+            //TODO: delete password
+
+            //Create the user in the auth service
+
         }
     }
 }

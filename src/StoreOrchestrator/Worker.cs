@@ -17,6 +17,12 @@ public class Worker : BackgroundService
             {
                 _logger.LogInformation("Worker running at: {time}", DateTimeOffset.Now);
             }
+
+            //Look for sagas that are not in a pending state (sent_at date?)
+            //Set the saga to pending and send the event
+            //If the sent_at date is stale (randomize), send again
+            //TODO: backoff logic
+
             await Task.Delay(1000, stoppingToken);
         }
     }
