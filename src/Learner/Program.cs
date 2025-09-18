@@ -7,6 +7,17 @@ namespace Learner {
         public static async Task Main(string[] args)
         {
             var host = CreateBuilder(args).Build();
+
+            await using var scope = host.Services.CreateAsyncScope();
+            var context = scope.ServiceProvider.GetRequiredService<LearnerUserDbContext>();
+
+            await context.Database.CanConnectAsync();
+
+            if (host.Services.GetRequiredService<IHostEnvironment>().IsDevelopment())
+            {
+                await SeedDevelopmentDatabase(host);
+            }
+
             host.Run();
         }
         public static async Task SeedDevelopmentDatabase(IHost host)
@@ -35,6 +46,15 @@ namespace Learner {
         {
             var builder = Host.CreateDefaultBuilder(args).ConfigureServices((context, services) =>
             {
+                // Register DbContext directly
+                services.AddDbContext<LearnerUserDbContext>(options =>
+                    options.UseSqlServer(context.Configuration.GetConnectionString("LearnerDatabase"),
+                        sqlServerOptionsAction: sqlOptions =>
+                        {
+                            sqlOptions.EnableRetryOnFailure();
+                        }
+                    )
+                );
                 // Keep your worker (optional)
                 services.AddHostedService<Learner.Worker>();
 

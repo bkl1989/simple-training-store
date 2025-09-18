@@ -12,6 +12,8 @@ var StoreOrchestratorSQL = sqlServer.AddDatabase("StoreOrchestratorDatabase");
 
 var OrderSQL = sqlServer.AddDatabase("OrderDatabase");
 
+var LearnerSQL = sqlServer.AddDatabase("LearnerDatabase");
+
 var user = builder.AddParameter("rabbit-user", secret: true);
 var pass = builder.AddParameter("rabbit-pass", secret: true);
 
@@ -22,6 +24,6 @@ builder.AddProject<Projects.APIGateway>("apigateway").WithExternalHttpEndpoints(
 builder.AddProject<Projects.Auth>("auth").WithReference(AuthSQL).WithReference(rabbit);
 builder.AddProject<Projects.StoreOrchestrator>("storeorchestrator").WithReference(StoreOrchestratorSQL).WithReference(rabbit);
 builder.AddProject<Projects.Order>("order").WithReference(OrderSQL).WithReference(rabbit);
-builder.AddProject<Projects.Learner>("learner").WithReference(rabbit);
+builder.AddProject<Projects.Learner>("learner").WithReference(LearnerSQL).WithReference(rabbit);
 
 builder.Build().Run();
