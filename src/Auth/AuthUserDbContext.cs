@@ -9,8 +9,8 @@ namespace Auth
     using Microsoft.EntityFrameworkCore;
     using System.Reflection.Metadata;
 
-    public class UserDBContext(DbContextOptions options) : DbContext(options)
+    public class AuthUserDbContext(DbContextOptions<AuthUserDbContext> options) : DbContext(options)
     {
-        public DbSet<User> Users => Set<User>();
+        public DbSet<AuthUser> AuthUsers => Set<AuthUser>();
     }
 }

@@ -34,20 +34,16 @@ public class IntegrationTests
         var apiAppBuilder = APIGateway.Program.CreateBuilder(Array.Empty<string>());
 
         // Keep one open connection for the lifetime of the test host
-        var conn = new SqliteConnection("DataSource=:memory:");
+        var conn = new SqliteConnection("DataSource=:memory:;Cache=Shared");
         await conn.OpenAsync();
 
         // Override the DbContext for tests
         apiAppBuilder.WebHost.ConfigureServices(services =>
         {
-            // Remove the app’s existing DbContextOptions<UserDBContext> (likely SQL Server)
-            var descriptor = services.SingleOrDefault(
-                d => d.ServiceType == typeof(DbContextOptions<UserDBContext>));
-            if (descriptor is not null)
-                services.Remove(descriptor);
-
+            services.AddSingleton(conn);
             // Add SQLite DbContext using the open connection
-            services.AddDbContext<UserDBContext>(options => options.UseSqlite(conn));
+            services.AddDbContext<Auth.AuthUserDbContext>( options => options.UseSqlite(conn));
+            services.AddDbContext<StoreOrchestrator.StoreOrchestratorUserDbContext>(options => options.UseSqlite(conn));
         });
 
         // IMPORTANT: Use TestServer so GetTestClient() works
@@ -85,12 +81,19 @@ public class IntegrationTests
         // Ensure schema using the SAME container the app uses
         await using (var scope = apiApp.Services.CreateAsyncScope())
         {
-            var db = scope.ServiceProvider.GetRequiredService<UserDBContext>();
+            var db = scope.ServiceProvider.GetRequiredService<Auth.AuthUserDbContext>();
+            await db.Database.EnsureCreatedAsync();
+        }
+
+        await using (var scope = apiApp.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<StoreOrchestrator.StoreOrchestratorUserDbContext>();
             await db.Database.EnsureCreatedAsync();
         }
 
         // Your dev seed now resolves UserDBContext from the app container
         await Auth.Program.SeedDevelopmentDatabase(apiApp);
+        await StoreOrchestrator.Program.SeedDevelopmentDatabase(apiApp);
 
         _harness = apiApp.Services.GetRequiredService<ITestHarness>();
         await _harness.Start();

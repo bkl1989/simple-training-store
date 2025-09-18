@@ -6,15 +6,13 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Auth
+namespace StoreOrchestrator
 {
-    public sealed class User
+    public sealed class StoreOrchestratorUser
     {
         public int Id { get; set; }
         [Required]
-        public string EmailAddress { get; set; } = string.Empty;
-        [Required]
-        public byte [] HashedPassword { get; set; } = [];
+        public byte[] EncryptionKey { get; set; } = [];
     }
 
     public class MyDbContext : DbContext
@@ -22,8 +20,8 @@ namespace Auth
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             //Since we can guarantee the size of the hashed password, ensure it's stored that way in the DB
-            modelBuilder.Entity<User>()
-                .Property(u => u.HashedPassword)
+            modelBuilder.Entity<StoreOrchestratorUser>()
+                .Property(u => u.EncryptionKey)
                 .HasColumnType("binary(32)")
                 .IsFixedLength()
                 .IsRequired();

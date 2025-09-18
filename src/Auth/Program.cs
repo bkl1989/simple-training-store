@@ -17,7 +17,7 @@ namespace Auth
             var host = CreateHostBuilder(args).Build();
 
             await using var scope = host.Services.CreateAsyncScope();
-            var context = scope.ServiceProvider.GetRequiredService<UserDBContext>();
+            var context = scope.ServiceProvider.GetRequiredService<AuthUserDbContext>();
 
             // Ensure schema exists. Use MigrateAsync() if you rely on EF migrations.
             await context.Database.CanConnectAsync();
@@ -36,7 +36,7 @@ namespace Auth
                 .ConfigureServices((context, services) =>
                 {
                     // Register DbContext directly
-                    services.AddDbContext<UserDBContext>(options =>
+                    services.AddDbContext<AuthUserDbContext>(options =>
                         options.UseSqlServer(context.Configuration.GetConnectionString("sqldata"),
                             sqlServerOptionsAction: sqlOptions =>
                             {
@@ -68,12 +68,12 @@ namespace Auth
         public static async Task SeedDevelopmentDatabase(IHost host)
         {
             await using var scope = host.Services.CreateAsyncScope();
-            var context = scope.ServiceProvider.GetRequiredService<UserDBContext>();
+            var context = scope.ServiceProvider.GetRequiredService<AuthUserDbContext>();
 
             // Ensure schema exists. Use MigrateAsync() if you rely on EF migrations.
-            await context.Database.EnsureCreatedAsync();
+            //await context.Database.EnsureCreatedAsync();
 
-            if (!await context.Users.AnyAsync())
+            if (!await context.AuthUsers.AnyAsync())
             {
                 const string password = "123Password";
 
@@ -89,11 +89,11 @@ namespace Auth
 
                 byte[] hash = pbkdf2.GetBytes(32);
 
-                context.Users.Add(new User
+                context.AuthUsers.Add(new AuthUser
                 {
                     EmailAddress = "bkl1989@gmail.com",
-                    HashedPassword = hash
-                    // Store salt if you need password validation later
+                    HashedPassword = hash,
+                    Salt = salt
                 });
 
                 await context.SaveChangesAsync();
@@ -103,16 +103,16 @@ namespace Auth
 
     public sealed class AskAuthServiceStatusConsumer : IConsumer<Contracts.AskForAuthServiceStatus>
     {
-        private readonly UserDBContext _db;
+        private readonly AuthUserDbContext _db;
 
-        public AskAuthServiceStatusConsumer(UserDBContext db)
+        public AskAuthServiceStatusConsumer(AuthUserDbContext db)
         {
             _db = db;
         }
 
         public async Task Consume(ConsumeContext<Contracts.AskForAuthServiceStatus> ctx)
         {
-            var user = await _db.Users.AsNoTracking().FirstOrDefaultAsync();
+            var user = await _db.AuthUsers.AsNoTracking().FirstOrDefaultAsync();
             await ctx.RespondAsync(
                 new Contracts.SendAuthServiceStatus(ctx.Message.CorrelationId, "RUNNING")
             );
