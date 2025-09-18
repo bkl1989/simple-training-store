@@ -20,7 +20,6 @@ namespace Order {
                 await SeedDevelopmentDatabase(host);
             }
 
-
             host.Run();
         }
 
@@ -38,7 +37,6 @@ namespace Order {
 
                 context.OrderUsers.Add(new OrderUser
                 {
-                    Id = 1,
                     EncryptedCreditCardName = "John Q Test",
                     EncryptedCreditCardNumber = "0000 0000 0000 0000",
                     EncryptedCreditCardExpiration = "01/25"
@@ -52,6 +50,15 @@ namespace Order {
         {
             var builder = Host.CreateDefaultBuilder(args).ConfigureServices((context, services) =>
             {
+                // Register DbContext directly
+                services.AddDbContext<OrderUserDbContext>(options =>
+                    options.UseSqlServer(context.Configuration.GetConnectionString("OrderDatabase"),
+                        sqlServerOptionsAction: sqlOptions =>
+                        {
+                            sqlOptions.EnableRetryOnFailure();
+                        }
+                    )
+                );
                 // Keep your worker (optional)
                 services.AddHostedService<Order.Worker>();
 

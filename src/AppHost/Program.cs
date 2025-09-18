@@ -10,6 +10,8 @@ var AuthSQL = sqlServer.AddDatabase("AuthDatabase");
 
 var StoreOrchestratorSQL = sqlServer.AddDatabase("StoreOrchestratorDatabase");
 
+var OrderSQL = sqlServer.AddDatabase("OrderDatabase");
+
 var user = builder.AddParameter("rabbit-user", secret: true);
 var pass = builder.AddParameter("rabbit-pass", secret: true);
 
@@ -19,7 +21,7 @@ var rabbit = builder.AddRabbitMQ("rabbit", user, pass)
 builder.AddProject<Projects.APIGateway>("apigateway").WithExternalHttpEndpoints().WithReference(rabbit);
 builder.AddProject<Projects.Auth>("auth").WithReference(AuthSQL).WithReference(rabbit);
 builder.AddProject<Projects.StoreOrchestrator>("storeorchestrator").WithReference(StoreOrchestratorSQL).WithReference(rabbit);
-builder.AddProject<Projects.Order>("order").WithReference(rabbit);
+builder.AddProject<Projects.Order>("order").WithReference(OrderSQL).WithReference(rabbit);
 builder.AddProject<Projects.Learner>("learner").WithReference(rabbit);
 
 builder.Build().Run();
