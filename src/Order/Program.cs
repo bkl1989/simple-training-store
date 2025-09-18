@@ -37,9 +37,7 @@ namespace Order {
 
                 context.OrderUsers.Add(new OrderUser
                 {
-                    EncryptedCreditCardName = "John Q Test",
-                    EncryptedCreditCardNumber = "0000 0000 0000 0000",
-                    EncryptedCreditCardExpiration = "01/25"
+                    UserAggregateId = 1
                 });
 
                 await context.SaveChangesAsync();

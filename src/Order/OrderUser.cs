@@ -12,10 +12,7 @@ namespace Order
     {
         public int Id { get; set; }
         [Required]
-        public string EncryptedCreditCardNumber { get; set; } = string.Empty;
-        [Required]
-        public string EncryptedCreditCardName { get; set; } = string.Empty;
-        [Required]
-        public string EncryptedCreditCardExpiration { get; set; } = string.Empty;
+
+        public int UserAggregateId { get; set; }
     }
 }

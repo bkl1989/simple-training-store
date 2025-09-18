@@ -11,13 +11,15 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Newtonsoft.Json;
 using NUnit.Framework;
 using Order;
 using StoreOrchestrator;
 using System;
+using System.Linq; // <-- added
 using System.Net;
 using System.Threading.Tasks;
-using System.Linq; // <-- added
+using System.Text;
 
 namespace ApiTests;
 
@@ -138,6 +140,59 @@ public class IntegrationTests
         await _harness.Start();
 
         apiClient = apiApp.GetTestClient();
+    }
+
+    /*
+ 
+    class Program
+{
+    static async Task Main(string[] args)
+    {
+        var httpClient = new HttpClient();
+
+        // Define the data to send
+        var data = new
+        {
+            Name = "John Doe",
+            Age = 30,
+            Email = "johndoe@example.com"
+        };
+
+        // Serialize the data to JSON
+        var json = JsonConvert.SerializeObject(data);
+        var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+        // Send the POST request
+        var response = await httpClient.PostAsync("https://example.com/api/endpoint", content);
+
+        // Read and display the response
+        var responseContent = await response.Content.ReadAsStringAsync();
+        Console.WriteLine($"Response: {responseContent}");
+    }
+}
+
+     */
+
+
+    [Test]
+    public async Task CreatesUser()
+    {
+        var userData = new
+        {
+            FirstName = "John",
+            LastName = "Test",
+            EmailAddress = "me@test.com",
+            Password = "9r$s0gn#20a!"
+        };
+
+        var userDataJson = JsonConvert.SerializeObject(userData);
+        var userDataContent = new StringContent(userDataJson, Encoding.UTF8, "application/json");
+
+        var response = await apiClient.PostAsync("/api/v1/users", userDataContent);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var body = await response.Content.ReadAsStringAsync();
+        body.Should().Be("RUNNING");
     }
 
     [Test]

@@ -1,4 +1,5 @@
 using System;
+using System.ComponentModel.DataAnnotations;
 using System.Threading;
 using System.Threading.Tasks;
 using MassTransit;
@@ -8,6 +9,14 @@ using Microsoft.Extensions.Hosting;
 
 namespace APIGateway
 {
+    public class CreateUserDTO
+    {
+        [Required] public string FirstName { get; set; }
+        [Required] public string LastName { get; set; }
+        [Required] public string EmailAddress { get; set; }
+
+        [Required] public string Password { get; set; }
+    }
     public class Program
     {
         // ---- Entry point for production ----
@@ -110,6 +119,24 @@ namespace APIGateway
                         new Contracts.AskForLearnerServiceStatus(Guid.NewGuid()), cts.Token);
                     return response.Message.status;
                 });
+
+            /*
+             *app.MapPost("/create", async (HttpContext context) =>
+{
+    var requestBody = await new StreamReader(context.Request.Body).ReadToEndAsync();
+    return Results.Ok($"Received JSON: {requestBody}");
+});
+             */
+
+            app.MapPost("/api/v1/users",
+            async (CreateUserDTO user) =>
+            {
+                return Results.Ok($"Received user: {user.EmailAddress}");
+                //using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                //var response = await client.GetResponse<Contracts.SendLearnerServiceStatus>(
+                //    new Contracts.AskForLearnerServiceStatus(Guid.NewGuid()), cts.Token);
+                //return response.Message.status;
+            });
 
             return app;
         }
