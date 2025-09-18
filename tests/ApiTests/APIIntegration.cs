@@ -53,6 +53,9 @@ public class IntegrationTests
         var orderConn = new SqliteConnection("DataSource=:memory:;");
         await orderConn.OpenAsync();
 
+        var learnerConn = new SqliteConnection("DataSource=:memory:;");
+        await learnerConn.OpenAsync();
+
         // Override the DbContext for tests
 
         apiAppBuilder.WebHost.ConfigureServices(services =>
@@ -61,6 +64,7 @@ public class IntegrationTests
             services.AddDbContext<Auth.AuthUserDbContext>(options => options.UseSqlite(authConn));
             services.AddDbContext<StoreOrchestrator.StoreOrchestratorUserDbContext>(options => options.UseSqlite(orchestratorConn));
             services.AddDbContext<Order.OrderUserDbContext>(options => options.UseSqlite(orderConn));
+            services.AddDbContext<Learner.LearnerUserDbContext>(options => options.UseSqlite(learnerConn));
         });
 
         // IMPORTANT: Use TestServer so GetTestClient() works
@@ -91,6 +95,7 @@ public class IntegrationTests
             ["ConnectionStrings:AuthDatabase"] = "Server=ignored;Database=ignored;",
             ["ConnectionStrings:StoreOrchestratorDatabase"] = "Server=ignored;Database=ignored;",
             ["ConnectionStrings:OrderDatabase"] = "Server=ignored;Database=ignored;",
+            ["ConnectionStrings:LearnerDatabase"] = "Server=ignored;Database=ignored;",
         });
 
         apiApp = APIGateway.Program.Build(apiAppBuilder);
@@ -114,10 +119,18 @@ public class IntegrationTests
             await db.Database.EnsureCreatedAsync();
         }
 
+        await using (var scope = apiApp.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<Learner.LearnerUserDbContext>();
+            await db.Database.EnsureCreatedAsync();
+        }
+
+
         // Your dev seed now resolves UserDBContext from the app container
         await Auth.Program.SeedDevelopmentDatabase(apiApp);
         await StoreOrchestrator.Program.SeedDevelopmentDatabase(apiApp);
         await Order.Program.SeedDevelopmentDatabase(apiApp);
+        await Learner.Program.SeedDevelopmentDatabase(apiApp);
 
         await apiApp.StartAsync();
 

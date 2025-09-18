@@ -1,31 +1,76 @@
 using MassTransit;
+using Microsoft.EntityFrameworkCore;
 
-var builder = Host.CreateApplicationBuilder(args);
-
-// Keep your worker (optional)
-builder.Services.AddHostedService<Learner.Worker>();
-
-// MassTransit: respond to AskForLearnerServiceStatus
-builder.Services.AddMassTransit(mt =>
-{
-    mt.SetKebabCaseEndpointNameFormatter();
-
-    mt.AddConsumer<AskLearnerServiceStatusConsumer>();
-
-    mt.UsingRabbitMq((context, cfg) =>
+namespace Learner {
+    public sealed class Program
     {
-        var cfgRoot = context.GetRequiredService<IConfiguration>();
-        var amqp = cfgRoot.GetConnectionString("rabbit");
-        cfg.Host(new Uri(amqp));
-        cfg.ConfigureEndpoints(context);
-    });
-});
+        public static async Task Main(string[] args)
+        {
+            var host = CreateBuilder(args).Build();
+            host.Run();
+        }
+        public static async Task SeedDevelopmentDatabase(IHost host)
+        {
+            await using var scope = host.Services.CreateAsyncScope();
+            var context = scope.ServiceProvider.GetRequiredService<LearnerUserDbContext>();
 
-var host = builder.Build();
-host.Run();
+            // Ensure schema exists. Use MigrateAsync() if you rely on EF migrations.
+            await context.Database.EnsureCreatedAsync();
+            var anyUsers = await context.LearnerUsers.AnyAsync();
 
-public sealed class AskLearnerServiceStatusConsumer : IConsumer<Contracts.AskForLearnerServiceStatus>
-{
-    public Task Consume(ConsumeContext<Contracts.AskForLearnerServiceStatus> ctx)
-        => ctx.RespondAsync(new Contracts.SendLearnerServiceStatus(ctx.Message.CorrelationId, "RUNNING"));
+            if (!anyUsers)
+            {
+
+                context.LearnerUsers.Add(new LearnerUser
+                {
+                    EncryptedFirstName = "John",
+                    EncryptedLastName = "Test"
+                });
+
+                await context.SaveChangesAsync();
+            }
+        }
+
+        public static IHostBuilder CreateBuilder(string[] args)
+        {
+            var builder = Host.CreateDefaultBuilder(args).ConfigureServices((context, services) =>
+            {
+                // Keep your worker (optional)
+                services.AddHostedService<Learner.Worker>();
+
+                // MassTransit: respond to AskForLearnerServiceStatus
+                services.AddMassTransit(mt =>
+                {
+                    mt.SetKebabCaseEndpointNameFormatter();
+
+                    mt.AddConsumer<AskLearnerServiceStatusConsumer>();
+
+                    mt.UsingRabbitMq((context, cfg) =>
+                    {
+                        var cfgRoot = context.GetRequiredService<IConfiguration>();
+                        var amqp = cfgRoot.GetConnectionString("rabbit");
+                        cfg.Host(new Uri(amqp));
+                        cfg.ConfigureEndpoints(context);
+                    });
+                });
+            });
+
+            return builder;
+        }
+    }
+
+    public sealed class AskLearnerServiceStatusConsumer : IConsumer<Contracts.AskForLearnerServiceStatus>
+    {
+        private readonly LearnerUserDbContext _db;
+        public AskLearnerServiceStatusConsumer(LearnerUserDbContext db)
+        {
+            _db = db;
+        }
+        public async Task Consume(ConsumeContext<Contracts.AskForLearnerServiceStatus> ctx)
+        {
+            var user = await _db.LearnerUsers.AsNoTracking().FirstOrDefaultAsync();
+            await ctx.RespondAsync(new Contracts.SendLearnerServiceStatus(ctx.Message.CorrelationId, "RUNNING"));
+        }
+    }
+
 }
