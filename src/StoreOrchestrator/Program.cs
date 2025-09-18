@@ -81,6 +81,8 @@ namespace StoreOrchestrator
                     mt.AddConsumer<CreateUserConsumer>();
                     mt.AddRequestClient<Contracts.CreateAuthUser>();
                     mt.AddRequestClient<Contracts.AuthUserCreated>();
+                    mt.AddRequestClient<Contracts.CreateLearnerUser>();
+                    mt.AddRequestClient<Contracts.LearnerUserCreated>();
 
                     mt.UsingRabbitMq((context, cfg) =>
                     {
@@ -117,8 +119,13 @@ namespace StoreOrchestrator
     {
         private readonly StoreOrchestratorDbContext _db;
         private readonly IRequestClient<Contracts.CreateAuthUser> _authUserRequestClient;
+        private readonly IRequestClient<Contracts.CreateLearnerUser> _learnerUserRequestClient;
 
-        public CreateUserConsumer(StoreOrchestratorDbContext db, IRequestClient<Contracts.CreateAuthUser> authUserRequestClient)
+        public CreateUserConsumer(
+            StoreOrchestratorDbContext db, 
+            IRequestClient<Contracts.CreateAuthUser> authUserRequestClient,
+            IRequestClient<Contracts.CreateLearnerUser> learnerUserRequestClient
+        )
         {
             _db = db;
             _authUserRequestClient = authUserRequestClient;
@@ -147,7 +154,7 @@ namespace StoreOrchestrator
             ));
 
             //TODO: cancellation token
-            var response = await _authUserRequestClient.GetResponse<Contracts.CreateAuthUser>(
+            _authUserRequestClient.GetResponse<Contracts.AuthUserCreated>(
                     new Contracts.CreateAuthUser(
                         createdSaga.correlationId,
                         ctx.Message.email,
@@ -155,9 +162,13 @@ namespace StoreOrchestrator
                         createdSaga.aggregateId
                     ));
 
-            //TODO: delete password
-
-            //Create the user in the auth service
+            _learnerUserRequestClient.GetResponse<Contracts.LearnerUserCreated>(
+                    new Contracts.CreateLearnerUser(
+                        createdSaga.correlationId,
+                        ctx.Message.firstName,
+                        ctx.Message.lastName,
+                        createdSaga.aggregateId
+                    ));
 
         }
     }

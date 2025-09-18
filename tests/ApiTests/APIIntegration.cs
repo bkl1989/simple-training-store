@@ -1,7 +1,7 @@
 using APIGateway;
 using Auth;
+using Contracts;
 using FluentAssertions;
-using k8s.KubeConfigModels;
 using Learner;
 using MassTransit;
 using MassTransit.Testing;
@@ -12,15 +12,16 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using NUnit.Framework;
 using Order;
 using StoreOrchestrator;
 using System;
-using System.Linq; // <-- added
+using System.Collections.Generic;
 using System.Net;
-using System.Threading.Tasks;
+using System.Net.Http;
 using System.Text;
-using Newtonsoft.Json.Linq;
+using System.Threading.Tasks;
 
 namespace ApiTests;
 
@@ -30,56 +31,38 @@ public class IntegrationTests
     private HttpClient apiClient = null!;
     private ITestHarness? _harness;
 
-    private async void setUpDatabaseForContext()
-    {
-
-    }
-
-    private async void setUpDatabaseForService()
-    {
-
-    }
-
     [OneTimeSetUp]
     public async Task OneTimeSetUp()
     {
-        // Build a single TestServer host that includes API + all responders (Option A)
         var apiAppBuilder = APIGateway.Program.CreateBuilder(Array.Empty<string>());
 
-        // Keep one open connection for the lifetime of the test host
+        // In-memory SQLite connections (kept open)
         var authConn = new SqliteConnection("DataSource=:memory:;");
-        await authConn.OpenAsync();
-
         var orchestratorConn = new SqliteConnection("DataSource=:memory:;");
-        await orchestratorConn.OpenAsync();
-
         var orderConn = new SqliteConnection("DataSource=:memory:;");
-        await orderConn.OpenAsync();
-
         var learnerConn = new SqliteConnection("DataSource=:memory:;");
+        await authConn.OpenAsync();
+        await orchestratorConn.OpenAsync();
+        await orderConn.OpenAsync();
         await learnerConn.OpenAsync();
-
-        // Override the DbContext for tests
 
         apiAppBuilder.WebHost.ConfigureServices(services =>
         {
-            // Add SQLite DbContext using the open connection
-            services.AddDbContext<Auth.AuthUserDbContext>(options => options.UseSqlite(authConn));
-            services.AddDbContext<StoreOrchestrator.StoreOrchestratorDbContext>(options => options.UseSqlite(orchestratorConn));
-            services.AddDbContext<Order.OrderUserDbContext>(options => options.UseSqlite(orderConn));
-            services.AddDbContext<Learner.LearnerUserDbContext>(options => options.UseSqlite(learnerConn));
+            services.AddDbContext<Auth.AuthUserDbContext>(o => o.UseSqlite(authConn));
+            services.AddDbContext<StoreOrchestrator.StoreOrchestratorDbContext>(o => o.UseSqlite(orchestratorConn));
+            services.AddDbContext<Order.OrderUserDbContext>(o => o.UseSqlite(orderConn));
+            services.AddDbContext<Learner.LearnerUserDbContext>(o => o.UseSqlite(learnerConn));
         });
 
-        // IMPORTANT: Use TestServer so GetTestClient() works
         apiAppBuilder.WebHost.UseTestServer();
 
-        // One shared MassTransit test harness (consumers/responders + request clients)
         apiAppBuilder.Services.AddMassTransitTestHarness(cfg =>
         {
             cfg.AddConsumer<APIGateway.OrchestratorStatusConsumer>();
             cfg.AddConsumer<AskStoreOrchestratorStatusConsumer>();
             cfg.AddConsumer<CreateUserConsumer>();
             cfg.AddConsumer<CreateAuthUserConsumer>();
+            cfg.AddConsumer<CreateLearnerUserConsumer>();
             cfg.AddConsumer<AskOrderServiceStatusConsumer>();
             cfg.AddConsumer<AskAuthServiceStatusConsumer>();
             cfg.AddConsumer<AskLearnerServiceStatusConsumer>();
@@ -97,41 +80,25 @@ public class IntegrationTests
 
         apiAppBuilder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
         {
-            ["ConnectionStrings:AuthDatabase"] = "Server=ignored;Database=ignored;",
-            ["ConnectionStrings:StoreOrchestratorDatabase"] = "Server=ignored;Database=ignored;",
-            ["ConnectionStrings:OrderDatabase"] = "Server=ignored;Database=ignored;",
-            ["ConnectionStrings:LearnerDatabase"] = "Server=ignored;Database=ignored;",
+            ["ConnectionStrings:AuthDatabase"] = "ignored",
+            ["ConnectionStrings:StoreOrchestratorDatabase"] = "ignored",
+            ["ConnectionStrings:OrderDatabase"] = "ignored",
+            ["ConnectionStrings:LearnerDatabase"] = "ignored",
         });
 
         apiApp = APIGateway.Program.Build(apiAppBuilder);
 
-        // Ensure schema using the SAME container the app uses
+        // Ensure schema
         await using (var scope = apiApp.Services.CreateAsyncScope())
-        {
-            var db = scope.ServiceProvider.GetRequiredService<Auth.AuthUserDbContext>();
-            await db.Database.EnsureCreatedAsync();
-        }
-
+            await scope.ServiceProvider.GetRequiredService<Auth.AuthUserDbContext>().Database.EnsureCreatedAsync();
         await using (var scope = apiApp.Services.CreateAsyncScope())
-        {
-            var db = scope.ServiceProvider.GetRequiredService<StoreOrchestrator.StoreOrchestratorDbContext>();
-            await db.Database.EnsureCreatedAsync();
-        }
-
+            await scope.ServiceProvider.GetRequiredService<StoreOrchestrator.StoreOrchestratorDbContext>().Database.EnsureCreatedAsync();
         await using (var scope = apiApp.Services.CreateAsyncScope())
-        {
-            var db = scope.ServiceProvider.GetRequiredService<Order.OrderUserDbContext>();
-            await db.Database.EnsureCreatedAsync();
-        }
-
+            await scope.ServiceProvider.GetRequiredService<Order.OrderUserDbContext>().Database.EnsureCreatedAsync();
         await using (var scope = apiApp.Services.CreateAsyncScope())
-        {
-            var db = scope.ServiceProvider.GetRequiredService<Learner.LearnerUserDbContext>();
-            await db.Database.EnsureCreatedAsync();
-        }
+            await scope.ServiceProvider.GetRequiredService<Learner.LearnerUserDbContext>().Database.EnsureCreatedAsync();
 
-
-        // Your dev seed now resolves UserDBContext from the app container
+        // Seed
         await Auth.Program.SeedDevelopmentDatabase(apiApp);
         await StoreOrchestrator.Program.SeedDevelopmentDatabase(apiApp);
         await Order.Program.SeedDevelopmentDatabase(apiApp);
@@ -145,63 +112,70 @@ public class IntegrationTests
         apiClient = apiApp.GetTestClient();
     }
 
-    /*
- 
-    class Program
-{
-    static async Task Main(string[] args)
-    {
-        var httpClient = new HttpClient();
-
-        // Define the data to send
-        var data = new
-        {
-            Name = "John Doe",
-            Age = 30,
-            Email = "johndoe@example.com"
-        };
-
-        // Serialize the data to JSON
-        var json = JsonConvert.SerializeObject(data);
-        var content = new StringContent(json, Encoding.UTF8, "application/json");
-
-        // Send the POST request
-        var response = await httpClient.PostAsync("https://example.com/api/endpoint", content);
-
-        // Read and display the response
-        var responseContent = await response.Content.ReadAsStringAsync();
-        Console.WriteLine($"Response: {responseContent}");
-    }
-}
-
-     */
-
-
     [Test]
     public async Task CreatesUser()
     {
-        var userData = new
+        _harness.Should().NotBeNull();
+        var timeout = TimeSpan.FromSeconds(10);
+
+        // Inline listeners (no test-harness helpers needed)
+        var bus = apiApp.Services.GetRequiredService<IBus>();
+
+        var authTcs = new TaskCompletionSource<ConsumeContext<Contracts.AuthUserCreated>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var learnerTcs = new TaskCompletionSource<ConsumeContext<Contracts.LearnerUserCreated>>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        var h1 = bus.ConnectHandler<Contracts.AuthUserCreated>(ctx =>
         {
-            FirstName = "John",
-            LastName = "Test",
-            EmailAddress = "me@test.com",
-            Password = "9r$s0gn#20a!"
-        };
+            authTcs.TrySetResult(ctx);
+            return Task.CompletedTask;
+        });
+        var h2 = bus.ConnectHandler<Contracts.LearnerUserCreated>(ctx =>
+        {
+            learnerTcs.TrySetResult(ctx);
+            return Task.CompletedTask;
+        });
 
-        var userDataJson = JsonConvert.SerializeObject(userData);
-        var userDataContent = new StringContent(userDataJson, Encoding.UTF8, "application/json");
+        try
+        {
+            // Arrange + Act
+            var userData = new
+            {
+                FirstName = "John",
+                LastName = "Test",
+                EmailAddress = "me@test.com",
+                Password = "9r$s0gn#20a!"
+            };
 
-        var response = await apiClient.PostAsync("/api/v1/users", userDataContent);
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+            var userDataJson = JsonConvert.SerializeObject(userData);
+            var userDataContent = new StringContent(userDataJson, Encoding.UTF8, "application/json");
 
-        var body = await response.Content.ReadAsStringAsync();
-        //TODO: handle sad path
-        var bodyJson = JsonConvert.DeserializeObject<JObject>(body);
-        //check that bodyJson.aggregateId is set
-        var message = bodyJson!["message"];
-        message.Should().NotBeNull();
-        var IdToken = message!["aggregateId"]?.Value<string>();
-        IdToken.Should().NotBeNullOrWhiteSpace();
+            var response = await apiClient.PostAsync("/api/v1/users", userDataContent);
+            response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+            var body = await response.Content.ReadAsStringAsync();
+            var bodyObj = JsonConvert.DeserializeObject<JObject>(body)!;
+
+            var message = bodyObj["message"];
+            message.Should().NotBeNull("API should return a 'message' with aggregateId");
+
+            var aggregateIdText = message!["aggregateId"]?.Value<string>();
+            aggregateIdText.Should().NotBeNullOrWhiteSpace();
+            var aggregateId = Guid.Parse(aggregateIdText!);
+
+            // Await events
+            var authEvt = await Wait(authTcs.Task, timeout);
+            authEvt.Should().NotBeNull();
+
+            //var learnerEvt = await Wait(learnerTcs.Task, timeout);
+            //learnerEvt.Should().NotBeNull();
+
+        }
+        finally
+        {
+            // Detach handlers so they don't leak to other tests
+            h1.Disconnect();
+            h2.Disconnect();
+        }
     }
 
     [Test]
@@ -209,9 +183,7 @@ public class IntegrationTests
     {
         var response = await apiClient.GetAsync("/api/v1/status");
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-
-        var body = await response.Content.ReadAsStringAsync();
-        body.Should().Be("RUNNING");
+        (await response.Content.ReadAsStringAsync()).Should().Be("RUNNING");
     }
 
     [Test]
@@ -219,9 +191,7 @@ public class IntegrationTests
     {
         var response = await apiClient.GetAsync("/api/v1/store-orchestrator-status");
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-
-        var body = await response.Content.ReadAsStringAsync();
-        body.Should().Be("RUNNING");
+        (await response.Content.ReadAsStringAsync()).Should().Be("RUNNING");
     }
 
     [Test]
@@ -229,9 +199,7 @@ public class IntegrationTests
     {
         var response = await apiClient.GetAsync("/api/v1/order-service-status");
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-
-        var body = await response.Content.ReadAsStringAsync();
-        body.Should().Be("RUNNING");
+        (await response.Content.ReadAsStringAsync()).Should().Be("RUNNING");
     }
 
     [Test]
@@ -239,9 +207,7 @@ public class IntegrationTests
     {
         var response = await apiClient.GetAsync("/api/v1/auth-service-status");
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-
-        var body = await response.Content.ReadAsStringAsync();
-        body.Should().Be("RUNNING");
+        (await response.Content.ReadAsStringAsync()).Should().Be("RUNNING");
     }
 
     [Test]
@@ -249,9 +215,7 @@ public class IntegrationTests
     {
         var response = await apiClient.GetAsync("/api/v1/learner-service-status");
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-
-        var body = await response.Content.ReadAsStringAsync();
-        body.Should().Be("RUNNING");
+        (await response.Content.ReadAsStringAsync()).Should().Be("RUNNING");
     }
 
     [OneTimeTearDown]
@@ -267,5 +231,13 @@ public class IntegrationTests
             await apiApp.StopAsync();
             await apiApp.DisposeAsync();
         }
+    }
+
+    private static async Task<T> Wait<T>(Task<T> task, TimeSpan timeout)
+    {
+        var done = await Task.WhenAny(task, Task.Delay(timeout));
+        if (done != task)
+            throw new TimeoutException($"Timed out waiting for {typeof(T).Name}");
+        return await task;
     }
 }

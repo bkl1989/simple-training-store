@@ -25,3 +25,8 @@ public record CreateUserSagaStarted (Guid CorrelationId, Guid AggregateId, strin
 public record CreateAuthUser(Guid CorrelationId, string email, string password, Guid aggregateId);
 
 public record AuthUserCreated(Guid CorrelationId);
+
+//TODO: uniform order for aggregateID
+public record CreateLearnerUser(Guid CorrelationId, string firstName, string lastName, Guid aggregateId);
+
+public record LearnerUserCreated(Guid CorrelationId);

@@ -151,12 +151,14 @@ namespace Auth
 
             byte[] hash = pbkdf2.GetBytes(32);
 
-            var user = new AuthUser
+            _db.AuthUsers.Add(new AuthUser
             {
                 EmailAddress = ctx.Message.email,
                 HashedPassword = hash,
                 Salt = salt
-            };
+            });
+
+            await _db.SaveChangesAsync();
 
             await ctx.RespondAsync(
                 new Contracts.AuthUserCreated(ctx.Message.CorrelationId)

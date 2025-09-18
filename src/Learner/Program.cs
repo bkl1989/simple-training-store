@@ -1,5 +1,7 @@
+using Learner;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Cryptography;
 
 namespace Learner {
     public sealed class Program
@@ -34,8 +36,8 @@ namespace Learner {
 
                 context.LearnerUsers.Add(new LearnerUser
                 {
-                    EncryptedFirstName = "John",
-                    EncryptedLastName = "Test"
+                    FirstName = "John",
+                    LastName = "Test"
                 });
 
                 await context.SaveChangesAsync();
@@ -92,5 +94,29 @@ namespace Learner {
             await ctx.RespondAsync(new Contracts.SendLearnerServiceStatus(ctx.Message.CorrelationId, "RUNNING"));
         }
     }
+}
 
+
+public sealed class CreateLearnerUserConsumer : IConsumer<Contracts.CreateLearnerUser>
+{
+    private readonly LearnerUserDbContext _db;
+
+    public CreateLearnerUserConsumer(LearnerUserDbContext db)
+    {
+        _db = db;
+    }
+
+    public async Task Consume(ConsumeContext<Contracts.CreateLearnerUser> ctx)
+    {
+        await _db.LearnerUsers.AddAsync(new LearnerUser
+        {
+            AggregateId = ctx.Message.aggregateId,
+            FirstName = ctx.Message.firstName,
+            LastName = ctx.Message.lastName
+        });
+
+        await ctx.RespondAsync(
+            new Contracts.LearnerUserCreated(ctx.Message.CorrelationId)
+        );
+    }
 }

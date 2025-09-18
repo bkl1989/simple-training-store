@@ -11,8 +11,10 @@ namespace Learner
     {
         public int Id { get; set; }
         [Required]
-        public string EncryptedFirstName { get; set; } = string.Empty;
+        public string FirstName { get; set; } = string.Empty;
         [Required]
-        public string EncryptedLastName { get; set; } = string.Empty;
+        public string LastName { get; set; } = string.Empty;
+        [Required]
+        public Guid AggregateId { get; set; }
     }
 }
