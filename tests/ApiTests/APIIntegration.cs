@@ -27,6 +27,16 @@ public class IntegrationTests
     private HttpClient apiClient = null!;
     private ITestHarness? _harness;
 
+    private async void setUpDatabaseForContext()
+    {
+
+    }
+
+    private async void setUpDatabaseForService()
+    {
+
+    }
+
     [OneTimeSetUp]
     public async Task OneTimeSetUp()
     {
@@ -38,9 +48,9 @@ public class IntegrationTests
         await conn.OpenAsync();
 
         // Override the DbContext for tests
+
         apiAppBuilder.WebHost.ConfigureServices(services =>
         {
-            services.AddSingleton(conn);
             // Add SQLite DbContext using the open connection
             services.AddDbContext<Auth.AuthUserDbContext>( options => options.UseSqlite(conn));
             services.AddDbContext<StoreOrchestrator.StoreOrchestratorUserDbContext>(options => options.UseSqlite(conn));
@@ -76,24 +86,24 @@ public class IntegrationTests
 
         apiApp = APIGateway.Program.Build(apiAppBuilder);
 
-        await apiApp.StartAsync();
-
         // Ensure schema using the SAME container the app uses
         await using (var scope = apiApp.Services.CreateAsyncScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<Auth.AuthUserDbContext>();
-            await db.Database.EnsureCreatedAsync();
+            await db.Database.MigrateAsync();
         }
 
         await using (var scope = apiApp.Services.CreateAsyncScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<StoreOrchestrator.StoreOrchestratorUserDbContext>();
-            await db.Database.EnsureCreatedAsync();
+            await db.Database.MigrateAsync();
         }
 
         // Your dev seed now resolves UserDBContext from the app container
         await Auth.Program.SeedDevelopmentDatabase(apiApp);
         await StoreOrchestrator.Program.SeedDevelopmentDatabase(apiApp);
+
+        await apiApp.StartAsync();
 
         _harness = apiApp.Services.GetRequiredService<ITestHarness>();
         await _harness.Start();
