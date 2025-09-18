@@ -120,15 +120,19 @@ namespace StoreOrchestrator
         private readonly StoreOrchestratorDbContext _db;
         private readonly IRequestClient<Contracts.CreateAuthUser> _authUserRequestClient;
         private readonly IRequestClient<Contracts.CreateLearnerUser> _learnerUserRequestClient;
+        private readonly IRequestClient<Contracts.CreateOrderUser> _orderUserRequestClient;
 
         public CreateUserConsumer(
             StoreOrchestratorDbContext db, 
             IRequestClient<Contracts.CreateAuthUser> authUserRequestClient,
-            IRequestClient<Contracts.CreateLearnerUser> learnerUserRequestClient
+            IRequestClient<Contracts.CreateLearnerUser> learnerUserRequestClient,
+            IRequestClient<Contracts.CreateOrderUser> orderUserRequestClient
         )
         {
             _db = db;
             _authUserRequestClient = authUserRequestClient;
+            _learnerUserRequestClient = learnerUserRequestClient;
+            _orderUserRequestClient = orderUserRequestClient;
         }
         public async Task Consume(ConsumeContext<Contracts.CreateUser> ctx)
         {
@@ -170,6 +174,11 @@ namespace StoreOrchestrator
                         createdSaga.aggregateId
                     ));
 
+            _orderUserRequestClient.GetResponse<Contracts.OrderUserCreated>(
+                new Contracts.CreateOrderUser(
+                    createdSaga.correlationId,
+                    createdSaga.aggregateId
+                ));
         }
     }
 }

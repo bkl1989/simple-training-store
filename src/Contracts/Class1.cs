@@ -30,3 +30,7 @@ public record AuthUserCreated(Guid CorrelationId);
 public record CreateLearnerUser(Guid CorrelationId, string firstName, string lastName, Guid aggregateId);
 
 public record LearnerUserCreated(Guid CorrelationId);
+
+public record CreateOrderUser(Guid CorrelationId, Guid aggregateId);
+
+public record OrderUserCreated(Guid CorrelationId);

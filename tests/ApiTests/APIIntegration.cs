@@ -63,6 +63,7 @@ public class IntegrationTests
             cfg.AddConsumer<CreateUserConsumer>();
             cfg.AddConsumer<CreateAuthUserConsumer>();
             cfg.AddConsumer<CreateLearnerUserConsumer>();
+            cfg.AddConsumer<CreateOrderUserConsumer>();
             cfg.AddConsumer<AskOrderServiceStatusConsumer>();
             cfg.AddConsumer<AskAuthServiceStatusConsumer>();
             cfg.AddConsumer<AskLearnerServiceStatusConsumer>();
@@ -123,15 +124,21 @@ public class IntegrationTests
 
         var authTcs = new TaskCompletionSource<ConsumeContext<Contracts.AuthUserCreated>>(TaskCreationOptions.RunContinuationsAsynchronously);
         var learnerTcs = new TaskCompletionSource<ConsumeContext<Contracts.LearnerUserCreated>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var orderTcs = new TaskCompletionSource<ConsumeContext<Contracts.OrderUserCreated>>(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        var h1 = bus.ConnectHandler<Contracts.AuthUserCreated>(ctx =>
+        var authUserCreatedHandler = bus.ConnectHandler<Contracts.AuthUserCreated>(ctx =>
         {
             authTcs.TrySetResult(ctx);
             return Task.CompletedTask;
         });
-        var h2 = bus.ConnectHandler<Contracts.LearnerUserCreated>(ctx =>
+        var learnerUserCreatedHandler = bus.ConnectHandler<Contracts.LearnerUserCreated>(ctx =>
         {
             learnerTcs.TrySetResult(ctx);
+            return Task.CompletedTask;
+        });
+        var orderUserCreatedHandler = bus.ConnectHandler<Contracts.OrderUserCreated>(ctx =>
+        {
+            orderTcs.TrySetResult(ctx);
             return Task.CompletedTask;
         });
 
@@ -166,15 +173,18 @@ public class IntegrationTests
             var authEvt = await Wait(authTcs.Task, timeout);
             authEvt.Should().NotBeNull();
 
-            //var learnerEvt = await Wait(learnerTcs.Task, timeout);
-            //learnerEvt.Should().NotBeNull();
+            var learnerEvt = await Wait(learnerTcs.Task, timeout);
+            learnerEvt.Should().NotBeNull();
 
+            var orderEvt = await Wait(orderTcs.Task, timeout);
+            orderEvt.Should().NotBeNull();
         }
         finally
         {
             // Detach handlers so they don't leak to other tests
-            h1.Disconnect();
-            h2.Disconnect();
+            authUserCreatedHandler.Disconnect();
+            learnerUserCreatedHandler.Disconnect();
+            orderUserCreatedHandler.Disconnect();
         }
     }
 

@@ -13,6 +13,6 @@ namespace Order
         public int Id { get; set; }
         [Required]
 
-        public int UserAggregateId { get; set; }
+        public Guid AggregateId { get; set; }
     }
 }

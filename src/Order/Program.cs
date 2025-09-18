@@ -37,7 +37,7 @@ namespace Order {
 
                 context.OrderUsers.Add(new OrderUser
                 {
-                    UserAggregateId = 1
+                    AggregateId = Guid.Empty
                 });
 
                 await context.SaveChangesAsync();
@@ -94,5 +94,28 @@ namespace Order {
             await ctx.RespondAsync(new Contracts.SendOrderServiceStatus(ctx.Message.CorrelationId, "RUNNING"));
         }
     }
+
+    public sealed class CreateOrderUserConsumer : IConsumer<Contracts.CreateOrderUser>
+    {
+        private readonly OrderUserDbContext _db;
+
+        public CreateOrderUserConsumer(OrderUserDbContext db)
+        {
+            _db = db;
+        }
+
+        public async Task Consume(ConsumeContext<Contracts.CreateOrderUser> ctx)
+        {
+            await _db.OrderUsers.AddAsync(new OrderUser
+            {
+                AggregateId = ctx.Message.aggregateId
+            });
+
+            await ctx.RespondAsync(
+                new Contracts.OrderUserCreated(ctx.Message.CorrelationId)
+            );
+        }
+    }
+
 
 }
