@@ -50,13 +50,17 @@ public class IntegrationTests
         var orchestratorConn = new SqliteConnection("DataSource=:memory:;");
         await orchestratorConn.OpenAsync();
 
+        var orderConn = new SqliteConnection("DataSource=:memory:;");
+        await orderConn.OpenAsync();
+
         // Override the DbContext for tests
 
         apiAppBuilder.WebHost.ConfigureServices(services =>
         {
             // Add SQLite DbContext using the open connection
-            services.AddDbContext<Auth.AuthUserDbContext>( options => options.UseSqlite(authConn));
+            services.AddDbContext<Auth.AuthUserDbContext>(options => options.UseSqlite(authConn));
             services.AddDbContext<StoreOrchestrator.StoreOrchestratorUserDbContext>(options => options.UseSqlite(orchestratorConn));
+            services.AddDbContext<Order.OrderUserDbContext>(options => options.UseSqlite(orderConn));
         });
 
         // IMPORTANT: Use TestServer so GetTestClient() works
@@ -86,6 +90,7 @@ public class IntegrationTests
         {
             ["ConnectionStrings:AuthDatabase"] = "Server=ignored;Database=ignored;",
             ["ConnectionStrings:StoreOrchestratorDatabase"] = "Server=ignored;Database=ignored;",
+            ["ConnectionStrings:OrderDatabase"] = "Server=ignored;Database=ignored;",
         });
 
         apiApp = APIGateway.Program.Build(apiAppBuilder);
@@ -103,9 +108,16 @@ public class IntegrationTests
             await db.Database.EnsureCreatedAsync();
         }
 
+        await using (var scope = apiApp.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<Order.OrderUserDbContext>();
+            await db.Database.EnsureCreatedAsync();
+        }
+
         // Your dev seed now resolves UserDBContext from the app container
         await Auth.Program.SeedDevelopmentDatabase(apiApp);
         await StoreOrchestrator.Program.SeedDevelopmentDatabase(apiApp);
+        await Order.Program.SeedDevelopmentDatabase(apiApp);
 
         await apiApp.StartAsync();
 

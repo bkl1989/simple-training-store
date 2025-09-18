@@ -1,31 +1,93 @@
 using MassTransit;
+using Microsoft.EntityFrameworkCore;
 
-var builder = Host.CreateApplicationBuilder(args);
+namespace Order {
 
-// Keep your worker (optional)
-builder.Services.AddHostedService<Order.Worker>();
-
-// MassTransit: respond to AskForOrderServiceStatus
-builder.Services.AddMassTransit(mt =>
-{
-    mt.SetKebabCaseEndpointNameFormatter();
-
-    mt.AddConsumer<AskOrderServiceStatusConsumer>();
-
-    mt.UsingRabbitMq((context, cfg) =>
+    public sealed class Program
     {
-        var cfgRoot = context.GetRequiredService<IConfiguration>();
-        var amqp = cfgRoot.GetConnectionString("rabbit");
-        cfg.Host(new Uri(amqp));
-        cfg.ConfigureEndpoints(context);
-    });
-});
+        public static async Task Main(string[] args)
+        {
+            var builder = CreateBuilder(args);
+            var host = builder.Build();
 
-var host = builder.Build();
-host.Run();
+            await using var scope = host.Services.CreateAsyncScope();
+            var context = scope.ServiceProvider.GetRequiredService<OrderUserDbContext>();
 
-public sealed class AskOrderServiceStatusConsumer : IConsumer<Contracts.AskForOrderServiceStatus>
-{
-    public Task Consume(ConsumeContext<Contracts.AskForOrderServiceStatus> ctx)
-        => ctx.RespondAsync(new Contracts.SendOrderServiceStatus(ctx.Message.CorrelationId, "RUNNING"));
+            await context.Database.CanConnectAsync();
+
+            if (host.Services.GetRequiredService<IHostEnvironment>().IsDevelopment())
+            {
+                await SeedDevelopmentDatabase(host);
+            }
+
+
+            host.Run();
+        }
+
+        public static async Task SeedDevelopmentDatabase(IHost host)
+        {
+            await using var scope = host.Services.CreateAsyncScope();
+            var context = scope.ServiceProvider.GetRequiredService<OrderUserDbContext>();
+
+            // Ensure schema exists. Use MigrateAsync() if you rely on EF migrations.
+            await context.Database.EnsureCreatedAsync();
+            var anyUsers = await context.OrderUsers.AnyAsync();
+
+            if (!anyUsers)
+            {
+
+                context.OrderUsers.Add(new OrderUser
+                {
+                    Id = 1,
+                    EncryptedCreditCardName = "John Q Test",
+                    EncryptedCreditCardNumber = "0000 0000 0000 0000",
+                    EncryptedCreditCardExpiration = "01/25"
+                });
+
+                await context.SaveChangesAsync();
+            }
+        }
+
+        public static IHostBuilder CreateBuilder(string[] args)
+        {
+            var builder = Host.CreateDefaultBuilder(args).ConfigureServices((context, services) =>
+            {
+                // Keep your worker (optional)
+                services.AddHostedService<Order.Worker>();
+
+                // MassTransit: respond to AskForOrderServiceStatus
+                services.AddMassTransit(mt =>
+                {
+                    mt.SetKebabCaseEndpointNameFormatter();
+
+                    mt.AddConsumer<AskOrderServiceStatusConsumer>();
+
+                    mt.UsingRabbitMq((context, cfg) =>
+                    {
+                        var cfgRoot = context.GetRequiredService<IConfiguration>();
+                        var amqp = cfgRoot.GetConnectionString("rabbit");
+                        cfg.Host(new Uri(amqp));
+                        cfg.ConfigureEndpoints(context);
+                    });
+                });
+            });
+
+            return builder;
+        }
+    }
+    public sealed class AskOrderServiceStatusConsumer : IConsumer<Contracts.AskForOrderServiceStatus>
+    {
+        private readonly OrderUserDbContext _db;
+
+        public AskOrderServiceStatusConsumer(OrderUserDbContext db)
+        {
+            _db = db;
+        }
+        public async Task Consume(ConsumeContext<Contracts.AskForOrderServiceStatus> ctx)
+        {
+            var user = await _db.OrderUsers.AsNoTracking().FirstOrDefaultAsync();
+            await ctx.RespondAsync(new Contracts.SendOrderServiceStatus(ctx.Message.CorrelationId, "RUNNING"));
+        }
+    }
+
 }
