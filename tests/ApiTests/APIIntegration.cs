@@ -44,16 +44,19 @@ public class IntegrationTests
         var apiAppBuilder = APIGateway.Program.CreateBuilder(Array.Empty<string>());
 
         // Keep one open connection for the lifetime of the test host
-        var conn = new SqliteConnection("DataSource=:memory:;Cache=Shared");
-        await conn.OpenAsync();
+        var authConn = new SqliteConnection("DataSource=:memory:;");
+        await authConn.OpenAsync();
+
+        var orchestratorConn = new SqliteConnection("DataSource=:memory:;");
+        await orchestratorConn.OpenAsync();
 
         // Override the DbContext for tests
 
         apiAppBuilder.WebHost.ConfigureServices(services =>
         {
             // Add SQLite DbContext using the open connection
-            services.AddDbContext<Auth.AuthUserDbContext>( options => options.UseSqlite(conn));
-            services.AddDbContext<StoreOrchestrator.StoreOrchestratorUserDbContext>(options => options.UseSqlite(conn));
+            services.AddDbContext<Auth.AuthUserDbContext>( options => options.UseSqlite(authConn));
+            services.AddDbContext<StoreOrchestrator.StoreOrchestratorUserDbContext>(options => options.UseSqlite(orchestratorConn));
         });
 
         // IMPORTANT: Use TestServer so GetTestClient() works
@@ -81,7 +84,8 @@ public class IntegrationTests
 
         apiAppBuilder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
         {
-            ["ConnectionStrings:sqldata"] = "Server=ignored;Database=ignored;"
+            ["ConnectionStrings:AuthDatabase"] = "Server=ignored;Database=ignored;",
+            ["ConnectionStrings:StoreOrchestratorDatabase"] = "Server=ignored;Database=ignored;",
         });
 
         apiApp = APIGateway.Program.Build(apiAppBuilder);
@@ -90,13 +94,13 @@ public class IntegrationTests
         await using (var scope = apiApp.Services.CreateAsyncScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<Auth.AuthUserDbContext>();
-            await db.Database.MigrateAsync();
+            await db.Database.EnsureCreatedAsync();
         }
 
         await using (var scope = apiApp.Services.CreateAsyncScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<StoreOrchestrator.StoreOrchestratorUserDbContext>();
-            await db.Database.MigrateAsync();
+            await db.Database.EnsureCreatedAsync();
         }
 
         // Your dev seed now resolves UserDBContext from the app container

@@ -37,14 +37,13 @@ namespace Auth
                 {
                     // Register DbContext directly
                     services.AddDbContext<AuthUserDbContext>(options =>
-                        options.UseSqlServer(context.Configuration.GetConnectionString("sqldata"),
+                        options.UseSqlServer(context.Configuration.GetConnectionString("AuthDatabase"),
                             sqlServerOptionsAction: sqlOptions =>
                             {
                                 sqlOptions.EnableRetryOnFailure();
                             }
                         )
                     );
-
 
                     // Optional worker
                     services.AddHostedService<Auth.Worker>();
@@ -71,7 +70,7 @@ namespace Auth
             var context = scope.ServiceProvider.GetRequiredService<AuthUserDbContext>();
 
             // Ensure schema exists. Use MigrateAsync() if you rely on EF migrations.
-            //await context.Database.EnsureCreatedAsync();
+            await context.Database.EnsureCreatedAsync();
 
             if (!await context.AuthUsers.AnyAsync())
             {

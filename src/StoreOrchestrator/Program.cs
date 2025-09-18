@@ -1,5 +1,7 @@
+using k8s.KubeConfigModels;
 using MassTransit;
 using MassTransit.Caching.Internals;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -12,10 +14,20 @@ namespace StoreOrchestrator
 {
     public sealed class Program
     {
-        public static void Main(string[] args)
+        public static async Task Main(string[] args)
         {
-            var builder = CreateBuilder(args);
-            var host = Build(builder);
+            var host = CreateBuilder(args).Build();
+
+            await using var scope = host.Services.CreateAsyncScope();
+            var context = scope.ServiceProvider.GetRequiredService<StoreOrchestratorUserDbContext>();
+
+            await context.Database.CanConnectAsync();
+
+            if (host.Services.GetRequiredService<IHostEnvironment>().IsDevelopment())
+            {
+                await SeedDevelopmentDatabase(host);
+            }
+
             host.Run();
         }
 
@@ -25,7 +37,7 @@ namespace StoreOrchestrator
             var context = scope.ServiceProvider.GetRequiredService<StoreOrchestratorUserDbContext>();
 
             // Ensure schema exists. Use MigrateAsync() if you rely on EF migrations.
-            //await context.Database.EnsureCreatedAsync();
+            await context.Database.EnsureCreatedAsync();
             var anyUsers = await context.StoreOrchestratorUsers.AnyAsync();
 
             if (!anyUsers)
@@ -42,28 +54,36 @@ namespace StoreOrchestrator
             }
         }
 
-        public static IHost Build (HostApplicationBuilder builder)
-        {
-            return builder.Build();   
-        }
         //TODO: is this the correct form, rather than IHostBuilder, for similar instances?
-        public static HostApplicationBuilder CreateBuilder (string[]args)
+        public static IHostBuilder CreateBuilder (string[]args)
         {
-            var builder = Host.CreateApplicationBuilder(args);
-            builder.Services.AddHostedService<Worker>();
-
-            builder.Services.AddMassTransit(mt =>
+            var builder = Host.CreateDefaultBuilder(args).ConfigureServices((context, services) =>
             {
-                mt.SetKebabCaseEndpointNameFormatter();
+                services.AddHostedService<Worker>();
 
-                mt.AddConsumer<AskStoreOrchestratorStatusConsumer>();
+                // Register DbContext directly
+                services.AddDbContext<StoreOrchestratorUserDbContext>(options =>
+                    options.UseSqlServer(context.Configuration.GetConnectionString("StoreOrchestratorDatabase"),
+                        sqlServerOptionsAction: sqlOptions =>
+                        {
+                            sqlOptions.EnableRetryOnFailure();
+                        }
+                    )
+                );
 
-                mt.UsingRabbitMq((context, cfg) =>
+                services.AddMassTransit(mt =>
                 {
-                    var cfgRoot = context.GetRequiredService<IConfiguration>();
-                    var amqp = cfgRoot.GetConnectionString("rabbit");
-                    cfg.Host(new Uri(amqp));
-                    cfg.ConfigureEndpoints(context);
+                    mt.SetKebabCaseEndpointNameFormatter();
+
+                    mt.AddConsumer<AskStoreOrchestratorStatusConsumer>();
+
+                    mt.UsingRabbitMq((context, cfg) =>
+                    {
+                        var cfgRoot = context.GetRequiredService<IConfiguration>();
+                        var amqp = cfgRoot.GetConnectionString("rabbit");
+                        cfg.Host(new Uri(amqp));
+                        cfg.ConfigureEndpoints(context);
+                    });
                 });
             });
 
