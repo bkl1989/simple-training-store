@@ -1,3 +1,4 @@
+using Auth;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
 
@@ -66,6 +67,7 @@ namespace Order {
                     mt.AddConsumer<AskOrderServiceStatusConsumer>();
                     mt.AddConsumer<CreateOrderCourseConsumer>();
                     mt.AddConsumer<CreateOrderUserConsumer>();
+                    mt.AddConsumer<ProcessOrderConsumer>();
 
                     mt.UsingRabbitMq((context, cfg) =>
                     {
@@ -113,6 +115,38 @@ namespace Order {
 
             await ctx.RespondAsync(
                 new Contracts.OrderUserCreated(ctx.Message.CorrelationId)
+            );
+        }
+    }
+
+    public sealed class ProcessOrderConsumer : IConsumer<Contracts.ProcessOrder>
+    {
+        private readonly OrderDbContext _db;
+
+        public ProcessOrderConsumer(OrderDbContext db)
+        {
+            _db = db;
+        }
+
+        public async Task Consume(ConsumeContext<Contracts.ProcessOrder> ctx)
+        {
+            var token = ctx.Message.JwtToken;
+            TokenService decoder = new TokenService();
+            DecodedToken decoded = decoder.DecodeToken(token);
+
+            if (decoded.Username == null)
+            {
+                await ctx.RespondAsync(
+                    new Contracts.OrderProcessed(ctx.Message.CorrelationId, ctx.Message.AggregateId, Guid.Empty, ctx.Message.CourseIds)
+                );
+                return;
+            }
+
+            //stub for any processing logic
+            await Task.Delay(1000);
+
+            await ctx.RespondAsync(
+                new Contracts.OrderProcessed(ctx.Message.CorrelationId, ctx.Message.AggregateId, Guid.Parse(decoded.Username), ctx.Message.CourseIds)
             );
         }
     }

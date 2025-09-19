@@ -24,6 +24,7 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using static Microsoft.Azure.Amqp.CbsConstants;
 
@@ -79,6 +80,7 @@ public class IntegrationTests
             cfg.AddConsumer<CreateOrderCourseConsumer>();
             //create order
             cfg.AddConsumer<CreateOrderConsumer>();
+            cfg.AddConsumer<ProcessOrderConsumer>();
             //ask status
             cfg.AddConsumer<AskOrderServiceStatusConsumer>();
             cfg.AddConsumer<AskAuthServiceStatusConsumer>();
@@ -154,18 +156,18 @@ public class IntegrationTests
         // Inline listeners (no test-harness helpers needed)
         var bus = apiApp.Services.GetRequiredService<IBus>();
 
-        var learnerTcs = new TaskCompletionSource<ConsumeContext<Contracts.LearnerCourseCreated>>(TaskCreationOptions.RunContinuationsAsynchronously);
-        var orderTcs = new TaskCompletionSource<ConsumeContext<Contracts.OrderCourseCreated>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var createLearnerCourseTcs = new TaskCompletionSource<ConsumeContext<Contracts.LearnerCourseCreated>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var createOrderCourseTcs = new TaskCompletionSource<ConsumeContext<Contracts.OrderCourseCreated>>(TaskCreationOptions.RunContinuationsAsynchronously);
 
         var learnerCourseCreatedHandler = bus.ConnectHandler<Contracts.LearnerCourseCreated>(ctx =>
         {
-            learnerTcs.TrySetResult(ctx);
+            createLearnerCourseTcs.TrySetResult(ctx);
             return Task.CompletedTask;
         });
 
         var orderCourseCreatedHandler = bus.ConnectHandler<Contracts.OrderCourseCreated>(ctx =>
         {
-            orderTcs.TrySetResult(ctx);
+            createOrderCourseTcs.TrySetResult(ctx);
             return Task.CompletedTask;
         });
 
@@ -196,10 +198,10 @@ public class IntegrationTests
             var aggregateId = Guid.Parse(aggregateIdText!);
 
             // Await events
-            var learnerEvt = await Wait(learnerTcs.Task, timeout);
+            var learnerEvt = await Wait(createLearnerCourseTcs.Task, timeout);
             learnerEvt.Should().NotBeNull();
 
-            var orderEvt = await Wait(orderTcs.Task, timeout);
+            var orderEvt = await Wait(createOrderCourseTcs.Task, timeout);
             orderEvt.Should().NotBeNull();
         }
         finally
@@ -219,23 +221,24 @@ public class IntegrationTests
         // Inline listeners (no test-harness helpers needed)
         var bus = apiApp.Services.GetRequiredService<IBus>();
 
-        var authTcs = new TaskCompletionSource<ConsumeContext<Contracts.AuthUserCreated>>(TaskCreationOptions.RunContinuationsAsynchronously);
-        var learnerTcs = new TaskCompletionSource<ConsumeContext<Contracts.LearnerUserCreated>>(TaskCreationOptions.RunContinuationsAsynchronously);
-        var orderTcs = new TaskCompletionSource<ConsumeContext<Contracts.OrderUserCreated>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var createAuthUserTcs = new TaskCompletionSource<ConsumeContext<Contracts.AuthUserCreated>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var createLearnerUserTcs = new TaskCompletionSource<ConsumeContext<Contracts.LearnerUserCreated>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var createOrderUserTcs = new TaskCompletionSource<ConsumeContext<Contracts.OrderUserCreated>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        //var processOrderTcs = new TaskCompletionSource<ConsumeContext<Contracts.OrderProcessed>>(TaskCreationOptions.RunContinuationsAsynchronously);
 
         var authUserCreatedHandler = bus.ConnectHandler<Contracts.AuthUserCreated>(ctx =>
         {
-            authTcs.TrySetResult(ctx);
+            createAuthUserTcs.TrySetResult(ctx);
             return Task.CompletedTask;
         });
         var learnerUserCreatedHandler = bus.ConnectHandler<Contracts.LearnerUserCreated>(ctx =>
         {
-            learnerTcs.TrySetResult(ctx);
+            createLearnerUserTcs.TrySetResult(ctx);
             return Task.CompletedTask;
         });
         var orderUserCreatedHandler = bus.ConnectHandler<Contracts.OrderUserCreated>(ctx =>
         {
-            orderTcs.TrySetResult(ctx);
+            createOrderUserTcs.TrySetResult(ctx);
             return Task.CompletedTask;
         });
 
@@ -267,7 +270,7 @@ public class IntegrationTests
             var aggregateId = Guid.Parse(aggregateIdText!);
 
             // Await events
-            var authEvt = await Wait(authTcs.Task, timeout);
+            var authEvt = await Wait(createAuthUserTcs.Task, timeout);
             authEvt.Should().NotBeNull();
 
             var authenticationData = new
@@ -281,10 +284,10 @@ public class IntegrationTests
             var authenticationResponse = await apiClient.PostAsync("/api/v1/auth", authenticationDataContent);
             authenticationResponse.StatusCode.Should().Be(HttpStatusCode.OK);
 
-            var learnerEvt = await Wait(learnerTcs.Task, timeout);
+            var learnerEvt = await Wait(createLearnerUserTcs.Task, timeout);
             learnerEvt.Should().NotBeNull();
 
-            var orderEvt = await Wait(orderTcs.Task, timeout);
+            var orderEvt = await Wait(createOrderUserTcs.Task, timeout);
             orderEvt.Should().NotBeNull();
         }
         finally
@@ -299,6 +302,14 @@ public class IntegrationTests
     [Test]
     public async Task CreatesOrder()
     {
+        var bus = apiApp.Services.GetRequiredService<IBus>();
+        var processOrderTcs = new TaskCompletionSource<ConsumeContext<Contracts.OrderProcessed>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var orderProcessedHandler = bus.ConnectHandler<Contracts.OrderProcessed>(ctx =>
+        {
+            processOrderTcs.TrySetResult(ctx);
+            return Task.CompletedTask;
+        });
+
         var authenticationData = new
         {
             Username = "me@test.com",
@@ -321,7 +332,7 @@ public class IntegrationTests
 
         var createCourseData = new
         {
-            courses = (Guid [])[Guid.Empty]
+            CourseIds = (Guid [])[Guid.Empty]
         };
         var userDataJson = JsonConvert.SerializeObject(createCourseData);
         var userDataContent = new StringContent(userDataJson, Encoding.UTF8, "application/json");
@@ -333,6 +344,11 @@ public class IntegrationTests
         req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token); // <-- set token in header
 
         var response = await apiClient.SendAsync(req);
+
+        var timeout = TimeSpan.FromSeconds(10);
+
+        var orderEvt = await Wait(processOrderTcs.Task, timeout);
+        orderEvt.Should().NotBeNull();
     }
 
     [Test]

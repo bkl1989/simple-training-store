@@ -92,6 +92,9 @@ namespace StoreOrchestrator
                     mt.AddRequestClient<Contracts.LearnerCourseCreated>();
                     mt.AddRequestClient<Contracts.CreateOrderCourse>();
                     mt.AddRequestClient<Contracts.OrderCourseCreated>();
+                    //Create order
+                    mt.AddRequestClient<Contracts.ProcessOrder>();
+                    mt.AddRequestClient<Contracts.OrderProcessed>();
 
                     mt.UsingRabbitMq((context, cfg) =>
                     {
@@ -253,18 +256,15 @@ namespace StoreOrchestrator
     public class CreateOrderConsumer : IConsumer<Contracts.CreateOrder>
     {
         private readonly StoreOrchestratorDbContext _db;
-        //private readonly IRequestClient<Contracts.CreateLearnerCourse> _learnerCourseRequestClient;
-        //private readonly IRequestClient<Contracts.CreateOrderCourse> _orderCourseRequestClient;
+        private readonly IRequestClient<Contracts.ProcessOrder> _processOrderRequestClient;
 
         public CreateOrderConsumer(
-            StoreOrchestratorDbContext db
-            //IRequestClient<Contracts.CreateLearnerCourse> learnerCourseRequestClient,
-            //IRequestClient<Contracts.CreateOrderCourse> orderCourseRequestClient
+            StoreOrchestratorDbContext db,
+            IRequestClient<Contracts.ProcessOrder> processOrderRequestClient
         )
         {
             _db = db;
-            //_learnerCourseRequestClient = learnerCourseRequestClient;
-            //_orderCourseRequestClient = orderCourseRequestClient;
+            _processOrderRequestClient = processOrderRequestClient;
         }
         public async Task Consume(ConsumeContext<Contracts.CreateOrder> ctx)
         {
@@ -309,13 +309,13 @@ namespace StoreOrchestrator
             ));
 
             ////TODO: cancellation token
-            //_learnerCourseRequestClient.GetResponse<Contracts.LearnerCourseCreated>(
-            //        new Contracts.CreateLearnerCourse(
-            //            createdSaga.correlationId,
-            //            createdSaga.aggregateId,
-            //            ctx.Message.Title,
-            //            ctx.Message.Description
-            //        ));
+            _processOrderRequestClient.GetResponse<Contracts.OrderProcessed>(
+                    new Contracts.ProcessOrder(
+                        ctx.Message.CorrelationId,
+                        ctx.Message.AggregateId,
+                        JWTToken,
+                        ctx.Message.CourseIds
+                    ));
 
             //_orderCourseRequestClient.GetResponse<Contracts.OrderCourseCreated>(
             //new Contracts.CreateOrderCourse(

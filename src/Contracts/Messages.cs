@@ -55,6 +55,10 @@ public record CreateOrder(Guid CorrelationId, Guid AggregateId, string JwtToken,
 
 public record CreateOrderSagaStarted(Guid CorrelationId, Guid AggregateId, bool paymentApproved, Guid UserAggregateId, Guid[] CourseIds);
 
+public record ProcessOrder(Guid CorrelationId, Guid AggregateId, string JwtToken, Guid[] CourseIds );
+
+public record OrderProcessed(Guid CorrelationId, Guid AggregateId, Guid UserAggregateId, Guid[] CourseIds );
+
 //Authentication
 
 public record ValidateCredentials(Guid CorrelationId, string Username, string Password);
