@@ -2,15 +2,18 @@ using Auth;
 using Contracts;
 using k8s.KubeConfigModels;
 using MassTransit;
+using MessagePack.Formatters;
 using Microsoft.AspNetCore.DataProtection.AuthenticatedEncryption.ConfigurationModel;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using System;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Threading.Tasks;
+using System.Security.Cryptography;
 using static System.Net.WebRequestMethods;
 
 namespace Auth
@@ -22,7 +25,7 @@ namespace Auth
             var host = CreateHostBuilder(args).Build();
 
             await using var scope = host.Services.CreateAsyncScope();
-            var context = scope.ServiceProvider.GetRequiredService<AuthUserDbContext>();
+            var context = scope.ServiceProvider.GetRequiredService<AuthDbContext>();
 
             // Ensure schema exists. Use MigrateAsync() if you rely on EF migrations.
             await context.Database.CanConnectAsync();
@@ -40,8 +43,10 @@ namespace Auth
             Host.CreateDefaultBuilder(args)
                 .ConfigureServices((context, services) =>
                 {
+                    var tokenService = new TokenService();
+                    services.AddSingleton<ITokenService>(tokenService);
                     // Register DbContext directly
-                    services.AddDbContext<AuthUserDbContext>(options =>
+                    services.AddDbContext<AuthDbContext>(options =>
                         options.UseSqlServer(context.Configuration.GetConnectionString("AuthDatabase"),
                             sqlServerOptionsAction: sqlOptions =>
                             {
@@ -72,7 +77,7 @@ namespace Auth
         public static async Task SeedDevelopmentDatabase(IHost host)
         {
             await using var scope = host.Services.CreateAsyncScope();
-            var context = scope.ServiceProvider.GetRequiredService<AuthUserDbContext>();
+            var context = scope.ServiceProvider.GetRequiredService<AuthDbContext>();
 
             // Ensure schema exists. Use MigrateAsync() if you rely on EF migrations.
             await context.Database.EnsureCreatedAsync();
@@ -110,9 +115,9 @@ namespace Auth
 
     public sealed class AskAuthServiceStatusConsumer : IConsumer<Contracts.AskForAuthServiceStatus>
     {
-        private readonly AuthUserDbContext _db;
+        private readonly AuthDbContext _db;
 
-        public AskAuthServiceStatusConsumer(AuthUserDbContext db)
+        public AskAuthServiceStatusConsumer(AuthDbContext db)
         {
             _db = db;
         }
@@ -126,11 +131,59 @@ namespace Auth
         }
     }
 
+    public sealed class ValidateCredentialsConsumer : IConsumer<Contracts.ValidateCredentials>
+    {
+        private readonly AuthDbContext _db;
+        private readonly ITokenService _tokenService;
+        private readonly IConfiguration _config;
+
+        public ValidateCredentialsConsumer(AuthDbContext db, ITokenService tokenService, IConfiguration config)
+        {
+            _db = db;
+            _tokenService = tokenService;
+            _config = config;
+        }
+
+        public async Task Consume(ConsumeContext<Contracts.ValidateCredentials> ctx)
+        {
+            string token = "";
+
+            AuthUser userForEmail = await _db.AuthUsers.SingleOrDefaultAsync(u => u.EmailAddress == ctx.Message.Username);
+            byte[] salt = userForEmail!.Salt;
+
+            using var pbkdf2 = new Rfc2898DeriveBytes(
+                ctx.Message.Password,
+                salt,
+                iterations: 100_000,
+                HashAlgorithmName.SHA256);
+
+            byte[] hash = pbkdf2.GetBytes(32);
+
+            if (CryptographicOperations.FixedTimeEquals(hash, userForEmail.HashedPassword))
+            {
+                token = _tokenService.BuildToken(
+                                        //temporary. I'm not that dumb.
+                                        "8y8xk8cR5c0Y0w0h0xg9o8nV8w3H9C3R8n6l5i2k1m0b9a7d6c4e2f0g8h7j6k5",
+                                        "360training.com",
+                                        new[]
+                                        {
+                                            "360training.com"
+                                        },
+                                        ctx.Message.Username);
+            }
+
+
+            await ctx.RespondAsync(
+                new Contracts.CredentialsWereValidated(ctx.Message.CorrelationId, token, true)
+            );
+        }
+    }
+
     public sealed class CreateAuthUserConsumer : IConsumer<Contracts.CreateAuthUser>
     {
-        private readonly AuthUserDbContext _db;
+        private readonly AuthDbContext _db;
 
-        public CreateAuthUserConsumer(AuthUserDbContext db)
+        public CreateAuthUserConsumer(AuthDbContext db)
         {
             _db = db;
         }

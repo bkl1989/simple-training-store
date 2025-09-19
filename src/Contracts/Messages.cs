@@ -48,3 +48,9 @@ public record LearnerCourseCreated(Guid CorrelationId, Guid AggregateId);
 public record CreateOrderCourse(Guid CorrleationId, Guid AggregateId, string title, int price);
 
 public record OrderCourseCreated(Guid CorrelationId, Guid AggregateId);
+
+//Authentication
+
+public record ValidateCredentials(Guid CorrelationId, string Username, string Password);
+
+public record CredentialsWereValidated(Guid CorrelationId, string token, bool isAuthenticated);

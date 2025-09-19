@@ -48,7 +48,10 @@ public class IntegrationTests
 
         apiAppBuilder.WebHost.ConfigureServices(services =>
         {
-            services.AddDbContext<Auth.AuthUserDbContext>(o => o.UseSqlite(authConn));
+            var tokenService = new TokenService();
+            services.AddSingleton<ITokenService>(tokenService);
+
+            services.AddDbContext<Auth.AuthDbContext>(o => o.UseSqlite(authConn));
             services.AddDbContext<StoreOrchestrator.StoreOrchestratorDbContext>(o => o.UseSqlite(orchestratorConn));
             services.AddDbContext<Order.OrderDbContext>(o => o.UseSqlite(orderConn));
             services.AddDbContext<Learner.LearnerDbContext>(o => o.UseSqlite(learnerConn));
@@ -75,6 +78,8 @@ public class IntegrationTests
             cfg.AddConsumer<AskAuthServiceStatusConsumer>();
             cfg.AddConsumer<AskLearnerServiceStatusConsumer>();
             cfg.AddConsumer<AskStoreOrchestratorStatusConsumer>();
+            //authenticate
+            cfg.AddConsumer<ValidateCredentialsConsumer>();
 
             cfg.AddRequestClient<Contracts.AskForOrchestratorStatus>();
             cfg.AddRequestClient<Contracts.AskForOrderServiceStatus>();
@@ -99,7 +104,7 @@ public class IntegrationTests
 
         // Ensure schema
         await using (var scope = apiApp.Services.CreateAsyncScope())
-            await scope.ServiceProvider.GetRequiredService<Auth.AuthUserDbContext>().Database.EnsureCreatedAsync();
+            await scope.ServiceProvider.GetRequiredService<Auth.AuthDbContext>().Database.EnsureCreatedAsync();
         await using (var scope = apiApp.Services.CreateAsyncScope())
             await scope.ServiceProvider.GetRequiredService<StoreOrchestrator.StoreOrchestratorDbContext>().Database.EnsureCreatedAsync();
         await using (var scope = apiApp.Services.CreateAsyncScope())
@@ -245,6 +250,16 @@ public class IntegrationTests
             // Await events
             var authEvt = await Wait(authTcs.Task, timeout);
             authEvt.Should().NotBeNull();
+
+            var authenticationData = new
+            {
+                Username ="me@test.com",
+                Password = "9r$s0gn#20a!"
+            };
+            var authenticationDataJson = JsonConvert.SerializeObject(authenticationData);
+            var authenticationDataContent = new StringContent(authenticationDataJson, Encoding.UTF8, "application/json");
+            var authenticationResponse = await apiClient.PostAsync("/api/v1/auth", authenticationDataContent);
+            authenticationResponse.StatusCode.Should().Be(HttpStatusCode.OK);
 
             var learnerEvt = await Wait(learnerTcs.Task, timeout);
             learnerEvt.Should().NotBeNull();

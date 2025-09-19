@@ -24,6 +24,14 @@ namespace APIGateway
         [Required] public string Description { get; set; }
         [Required] public int Price { get; set; }
     }
+
+    public class CredentialsDTO
+    {
+        [Required] public string Username { get; set; }
+
+        [Required] public string Password { get; set; }
+    }
+
     public class Program
     {
         // ---- Entry point for production ----
@@ -61,10 +69,15 @@ namespace APIGateway
                 cfg.AddRequestClient<Contracts.AskForOrderServiceStatus>();
                 cfg.AddRequestClient<Contracts.AskForAuthServiceStatus>();
                 cfg.AddRequestClient<Contracts.AskForLearnerServiceStatus>();
+                //create user
                 cfg.AddRequestClient<Contracts.CreateUser>();
-                cfg.AddRequestClient<Contracts.CreateCourse>();
                 cfg.AddRequestClient<Contracts.CreateUserSagaStarted>();
+                //create course
+                cfg.AddRequestClient<Contracts.CreateCourse>();
                 cfg.AddRequestClient<Contracts.CreateCourseSagaStarted>();
+                //authenticate
+                cfg.AddRequestClient<Contracts.ValidateCredentials>();
+                cfg.AddRequestClient<Contracts.CredentialsWereValidated>();
 
                 cfg.UsingRabbitMq((context, cfg) =>
                 {
@@ -157,6 +170,20 @@ namespace APIGateway
                         course.Title,
                         course.Description,
                         course.Price
+                    ), cts.Token);
+
+                return Results.Ok(response);
+            });
+
+            app.MapPost("/api/v1/auth",
+            async (CredentialsDTO credentials, IRequestClient<Contracts.ValidateCredentials> client, CancellationToken ct) =>
+            {
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                var response = await client.GetResponse<Contracts.CredentialsWereValidated>(
+                    new Contracts.ValidateCredentials(
+                        Guid.NewGuid(),
+                        credentials.Username,
+                        credentials.Password
                     ), cts.Token);
 
                 return Results.Ok(response);
