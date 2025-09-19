@@ -2,6 +2,7 @@ using System;
 using System.ComponentModel.DataAnnotations;
 using System.Threading;
 using System.Threading.Tasks;
+using Auth;
 using MassTransit;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
@@ -30,6 +31,11 @@ namespace APIGateway
         [Required] public string Username { get; set; }
 
         [Required] public string Password { get; set; }
+    }
+
+    public class OrderDTO
+    {
+        [Required] public Guid[] CourseIds { get; set; }
     }
 
     public class Program
@@ -187,6 +193,21 @@ namespace APIGateway
                     ), cts.Token);
 
                 return Results.Ok(response);
+            });
+
+            app.MapPost("/api/v1/orders",
+            async (OrderDTO order, IRequestClient<Contracts.CreateOrder> client, CancellationToken ct) =>
+            {
+                string JWTToken = "";
+
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                var response = await client.GetResponse<Contracts.CreateOrderSagaStarted>(
+                    new Contracts.CreateOrder(
+                        Guid.NewGuid(),
+                        Guid.NewGuid(),
+                        JWTToken,
+                        order.CourseIds
+                    ), cts.Token);
             });
 
             return app;

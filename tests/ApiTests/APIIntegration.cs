@@ -124,6 +124,19 @@ public class IntegrationTests
         await _harness.Start();
 
         apiClient = apiApp.GetTestClient();
+
+        var userData = new
+        {
+            FirstName = "John",
+            LastName = "Test",
+            EmailAddress = "me@test.com",
+            Password = "9r$s0gn#20a!"
+        };
+
+        var userDataJson = JsonConvert.SerializeObject(userData);
+        var userDataContent = new StringContent(userDataJson, Encoding.UTF8, "application/json");
+
+        var response = await apiClient.PostAsync("/api/v1/users", userDataContent);
     }
 
     [Test]
@@ -222,19 +235,19 @@ public class IntegrationTests
 
         try
         {
-            // Arrange + Act
             var userData = new
             {
                 FirstName = "John",
                 LastName = "Test",
-                EmailAddress = "me@test.com",
-                Password = "9r$s0gn#20a!"
+                EmailAddress = "me2@test.com",
+                Password = "5tert$T$4rw4r"
             };
 
             var userDataJson = JsonConvert.SerializeObject(userData);
             var userDataContent = new StringContent(userDataJson, Encoding.UTF8, "application/json");
 
             var response = await apiClient.PostAsync("/api/v1/users", userDataContent);
+
             response.StatusCode.Should().Be(HttpStatusCode.OK);
 
             var body = await response.Content.ReadAsStringAsync();
@@ -253,9 +266,10 @@ public class IntegrationTests
 
             var authenticationData = new
             {
-                Username ="me@test.com",
-                Password = "9r$s0gn#20a!"
+                Username ="me2@test.com",
+                Password = "5tert$T$4rw4r"
             };
+
             var authenticationDataJson = JsonConvert.SerializeObject(authenticationData);
             var authenticationDataContent = new StringContent(authenticationDataJson, Encoding.UTF8, "application/json");
             var authenticationResponse = await apiClient.PostAsync("/api/v1/auth", authenticationDataContent);
@@ -275,6 +289,21 @@ public class IntegrationTests
             orderUserCreatedHandler.Disconnect();
         }
     }
+
+    //[Test]
+    //public async Task CreatesOrder()
+    //{
+    //    var authenticationData = new
+    //    {
+    //        Username = "me@test.com",
+    //        Password = "9r$s0gn#20a!"
+    //    };
+
+    //    var authenticationDataJson = JsonConvert.SerializeObject(authenticationData);
+    //    var authenticationDataContent = new StringContent(authenticationDataJson, Encoding.UTF8, "application/json");
+    //    var authenticationResponse = await apiClient.PostAsync("/api/v1/auth", authenticationDataContent);
+    //    authenticationResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+    //}
 
     [Test]
     public async Task APIGatewayStatusCheck()

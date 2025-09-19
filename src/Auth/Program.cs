@@ -15,6 +15,7 @@ using System.Security.Cryptography;
 using System.Threading.Tasks;
 using System.Security.Cryptography;
 using static System.Net.WebRequestMethods;
+using Microsoft.Extensions.Configuration;
 
 namespace Auth
 {
@@ -161,9 +162,10 @@ namespace Auth
 
             if (CryptographicOperations.FixedTimeEquals(hash, userForEmail.HashedPassword))
             {
+                
+
                 token = _tokenService.BuildToken(
-                                        //temporary. I'm not that dumb.
-                                        "8y8xk8cR5c0Y0w0h0xg9o8nV8w3H9C3R8n6l5i2k1m0b9a7d6c4e2f0g8h7j6k5",
+                                        TokenService.getJWTKey(),
                                         "360training.com",
                                         new[]
                                         {
