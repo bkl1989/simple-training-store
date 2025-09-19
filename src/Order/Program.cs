@@ -11,7 +11,7 @@ namespace Order {
             var host = builder.Build();
 
             await using var scope = host.Services.CreateAsyncScope();
-            var context = scope.ServiceProvider.GetRequiredService<OrderUserDbContext>();
+            var context = scope.ServiceProvider.GetRequiredService<OrderDbContext>();
 
             await context.Database.CanConnectAsync();
 
@@ -26,7 +26,7 @@ namespace Order {
         public static async Task SeedDevelopmentDatabase(IHost host)
         {
             await using var scope = host.Services.CreateAsyncScope();
-            var context = scope.ServiceProvider.GetRequiredService<OrderUserDbContext>();
+            var context = scope.ServiceProvider.GetRequiredService<OrderDbContext>();
 
             // Ensure schema exists. Use MigrateAsync() if you rely on EF migrations.
             await context.Database.EnsureCreatedAsync();
@@ -49,7 +49,7 @@ namespace Order {
             var builder = Host.CreateDefaultBuilder(args).ConfigureServices((context, services) =>
             {
                 // Register DbContext directly
-                services.AddDbContext<OrderUserDbContext>(options =>
+                services.AddDbContext<OrderDbContext>(options =>
                     options.UseSqlServer(context.Configuration.GetConnectionString("OrderDatabase"),
                         sqlServerOptionsAction: sqlOptions =>
                         {
@@ -66,6 +66,8 @@ namespace Order {
                     mt.SetKebabCaseEndpointNameFormatter();
 
                     mt.AddConsumer<AskOrderServiceStatusConsumer>();
+                    mt.AddConsumer<CreateOrderCourseConsumer>();
+                    mt.AddConsumer<CreateOrderUserConsumer>();
 
                     mt.UsingRabbitMq((context, cfg) =>
                     {
@@ -82,9 +84,9 @@ namespace Order {
     }
     public sealed class AskOrderServiceStatusConsumer : IConsumer<Contracts.AskForOrderServiceStatus>
     {
-        private readonly OrderUserDbContext _db;
+        private readonly OrderDbContext _db;
 
-        public AskOrderServiceStatusConsumer(OrderUserDbContext db)
+        public AskOrderServiceStatusConsumer(OrderDbContext db)
         {
             _db = db;
         }
@@ -97,9 +99,9 @@ namespace Order {
 
     public sealed class CreateOrderUserConsumer : IConsumer<Contracts.CreateOrderUser>
     {
-        private readonly OrderUserDbContext _db;
+        private readonly OrderDbContext _db;
 
-        public CreateOrderUserConsumer(OrderUserDbContext db)
+        public CreateOrderUserConsumer(OrderDbContext db)
         {
             _db = db;
         }
@@ -117,5 +119,27 @@ namespace Order {
         }
     }
 
+    public sealed class CreateOrderCourseConsumer : IConsumer<Contracts.CreateOrderCourse>
+    {
+        private readonly OrderDbContext _db;
 
+        public CreateOrderCourseConsumer(OrderDbContext db)
+        {
+            _db = db;
+        }
+
+        public async Task Consume(ConsumeContext<Contracts.CreateOrderCourse> ctx)
+        {
+            await _db.OrderCourses.AddAsync(new OrderCourse
+            {
+                Title = ctx.Message.title,
+                Price = ctx.Message.price,
+                AggregateId = ctx.Message.AggregateId
+            });
+
+            await ctx.RespondAsync(
+                new Contracts.OrderCourseCreated(ctx.Message.CorrleationId, ctx.Message.AggregateId)
+            );
+        }
+    }
 }

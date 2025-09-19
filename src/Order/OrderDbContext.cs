@@ -8,8 +8,9 @@ using System.Reflection.Metadata;
 
 namespace Order
 {
-    public class OrderUserDbContext(DbContextOptions<OrderUserDbContext> options) : DbContext(options)
+    public class OrderDbContext(DbContextOptions<OrderDbContext> options) : DbContext(options)
     {
         public DbSet<OrderUser> OrderUsers => Set<OrderUser>();
+        public DbSet<OrderCourse> OrderCourses => Set<OrderCourse>();
     }
 }

@@ -50,7 +50,7 @@ public class IntegrationTests
         {
             services.AddDbContext<Auth.AuthUserDbContext>(o => o.UseSqlite(authConn));
             services.AddDbContext<StoreOrchestrator.StoreOrchestratorDbContext>(o => o.UseSqlite(orchestratorConn));
-            services.AddDbContext<Order.OrderUserDbContext>(o => o.UseSqlite(orderConn));
+            services.AddDbContext<Order.OrderDbContext>(o => o.UseSqlite(orderConn));
             services.AddDbContext<Learner.LearnerDbContext>(o => o.UseSqlite(learnerConn));
         });
 
@@ -62,12 +62,14 @@ public class IntegrationTests
             
             //create user
             cfg.AddConsumer<CreateUserConsumer>();
-            cfg.AddConsumer<CreateCourseConsumer>();
+            
             cfg.AddConsumer<CreateAuthUserConsumer>();
             cfg.AddConsumer<CreateLearnerUserConsumer>();
             cfg.AddConsumer<CreateOrderUserConsumer>();
             //create course
             cfg.AddConsumer<CreateLearnerCourseConsumer>();
+            cfg.AddConsumer<CreateCourseConsumer>();
+            cfg.AddConsumer<CreateOrderCourseConsumer>();
             //ask status
             cfg.AddConsumer<AskOrderServiceStatusConsumer>();
             cfg.AddConsumer<AskAuthServiceStatusConsumer>();
@@ -101,7 +103,7 @@ public class IntegrationTests
         await using (var scope = apiApp.Services.CreateAsyncScope())
             await scope.ServiceProvider.GetRequiredService<StoreOrchestrator.StoreOrchestratorDbContext>().Database.EnsureCreatedAsync();
         await using (var scope = apiApp.Services.CreateAsyncScope())
-            await scope.ServiceProvider.GetRequiredService<Order.OrderUserDbContext>().Database.EnsureCreatedAsync();
+            await scope.ServiceProvider.GetRequiredService<Order.OrderDbContext>().Database.EnsureCreatedAsync();
         await using (var scope = apiApp.Services.CreateAsyncScope())
             await scope.ServiceProvider.GetRequiredService<Learner.LearnerDbContext>().Database.EnsureCreatedAsync();
 
@@ -129,23 +131,19 @@ public class IntegrationTests
         var bus = apiApp.Services.GetRequiredService<IBus>();
 
         var learnerTcs = new TaskCompletionSource<ConsumeContext<Contracts.LearnerCourseCreated>>(TaskCreationOptions.RunContinuationsAsynchronously);
-        //var learnerTcs = new TaskCompletionSource<ConsumeContext<Contracts.LearnerUserCreated>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var orderTcs = new TaskCompletionSource<ConsumeContext<Contracts.OrderCourseCreated>>(TaskCreationOptions.RunContinuationsAsynchronously);
 
         var learnerCourseCreatedHandler = bus.ConnectHandler<Contracts.LearnerCourseCreated>(ctx =>
         {
             learnerTcs.TrySetResult(ctx);
             return Task.CompletedTask;
         });
-        //var learnerUserCreatedHandler = bus.ConnectHandler<Contracts.LearnerUserCreated>(ctx =>
-        //{
-        //    learnerTcs.TrySetResult(ctx);
-        //    return Task.CompletedTask;
-        //});
-        //var orderUserCreatedHandler = bus.ConnectHandler<Contracts.OrderUserCreated>(ctx =>
-        //{
-        //    orderTcs.TrySetResult(ctx);
-        //    return Task.CompletedTask;
-        //});
+
+        var orderCourseCreatedHandler = bus.ConnectHandler<Contracts.OrderCourseCreated>(ctx =>
+        {
+            orderTcs.TrySetResult(ctx);
+            return Task.CompletedTask;
+        });
 
         try
         {
@@ -174,21 +172,17 @@ public class IntegrationTests
             var aggregateId = Guid.Parse(aggregateIdText!);
 
             // Await events
-            var authEvt = await Wait(learnerTcs.Task, timeout);
-            authEvt.Should().NotBeNull();
+            var learnerEvt = await Wait(learnerTcs.Task, timeout);
+            learnerEvt.Should().NotBeNull();
 
-            //var learnerEvt = await Wait(learnerTcs.Task, timeout);
-            //learnerEvt.Should().NotBeNull();
-
-            //var orderEvt = await Wait(orderTcs.Task, timeout);
-            //orderEvt.Should().NotBeNull();
+            var orderEvt = await Wait(orderTcs.Task, timeout);
+            orderEvt.Should().NotBeNull();
         }
         finally
         {
             // Detach handlers so they don't leak to other tests
             learnerCourseCreatedHandler.Disconnect();
-            //learnerUserCreatedHandler.Disconnect();
-            //orderUserCreatedHandler.Disconnect();
+            orderCourseCreatedHandler.Disconnect();
         }
     }
 

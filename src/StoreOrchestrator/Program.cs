@@ -78,6 +78,7 @@ namespace StoreOrchestrator
                     mt.SetKebabCaseEndpointNameFormatter();
 
                     mt.AddConsumer<AskStoreOrchestratorStatusConsumer>();
+                    //Create user
                     mt.AddConsumer<CreateUserConsumer>();
                     mt.AddRequestClient<Contracts.CreateAuthUser>();
                     mt.AddRequestClient<Contracts.AuthUserCreated>();
@@ -85,8 +86,11 @@ namespace StoreOrchestrator
                     mt.AddRequestClient<Contracts.LearnerUserCreated>();
                     mt.AddRequestClient<Contracts.CreateOrderUser>();
                     mt.AddRequestClient<Contracts.OrderUserCreated>();
+                    //Create course
                     mt.AddRequestClient<Contracts.CreateLearnerCourse>();
                     mt.AddRequestClient<Contracts.LearnerCourseCreated>();
+                    mt.AddRequestClient<Contracts.CreateOrderCourse>();
+                    mt.AddRequestClient<Contracts.OrderCourseCreated>();
 
                     mt.UsingRabbitMq((context, cfg) =>
                     {
@@ -190,20 +194,17 @@ namespace StoreOrchestrator
     {
         private readonly StoreOrchestratorDbContext _db;
         private readonly IRequestClient<Contracts.CreateLearnerCourse> _learnerCourseRequestClient;
-        //private readonly IRequestClient<Contracts.CreateLearnerUser> _learnerUserRequestClient;
-        //private readonly IRequestClient<Contracts.CreateOrderUser> _orderUserRequestClient;
+        private readonly IRequestClient<Contracts.CreateOrderCourse> _orderCourseRequestClient;
 
         public CreateCourseConsumer(
             StoreOrchestratorDbContext db,
-            IRequestClient<Contracts.CreateLearnerCourse> learnerCourseRequestClient
-            //IRequestClient<Contracts.CreateLearnerUser> learnerUserRequestClient,
-            //IRequestClient<Contracts.CreateOrderUser> orderUserRequestClient
+            IRequestClient<Contracts.CreateLearnerCourse> learnerCourseRequestClient,
+            IRequestClient<Contracts.CreateOrderCourse> orderCourseRequestClient
         )
         {
             _db = db;
             _learnerCourseRequestClient = learnerCourseRequestClient;
-            //_learnerUserRequestClient = learnerUserRequestClient;
-            //_orderUserRequestClient = orderUserRequestClient;
+            _orderCourseRequestClient = orderCourseRequestClient;
         }
         public async Task Consume(ConsumeContext<Contracts.CreateCourse> ctx)
         {
@@ -237,6 +238,14 @@ namespace StoreOrchestrator
                         ctx.Message.Title,
                         ctx.Message.Description
                     ));
+
+            _orderCourseRequestClient.GetResponse<Contracts.OrderCourseCreated>(
+            new Contracts.CreateOrderCourse(
+                createdSaga.correlationId,
+                createdSaga.aggregateId,
+                ctx.Message.Title,
+                ctx.Message.price
+            ));
 
             //_learnerUserRequestClient.GetResponse<Contracts.LearnerUserCreated>(
             //        new Contracts.CreateLearnerUser(
