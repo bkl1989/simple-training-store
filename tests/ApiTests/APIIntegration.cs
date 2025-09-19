@@ -61,6 +61,7 @@ public class IntegrationTests
             cfg.AddConsumer<APIGateway.OrchestratorStatusConsumer>();
             cfg.AddConsumer<AskStoreOrchestratorStatusConsumer>();
             cfg.AddConsumer<CreateUserConsumer>();
+            cfg.AddConsumer<CreateCourseConsumer>();
             cfg.AddConsumer<CreateAuthUserConsumer>();
             cfg.AddConsumer<CreateLearnerUserConsumer>();
             cfg.AddConsumer<CreateOrderUserConsumer>();
@@ -111,6 +112,79 @@ public class IntegrationTests
         await _harness.Start();
 
         apiClient = apiApp.GetTestClient();
+    }
+
+    [Test]
+    public async Task CreatesCourse()
+    {
+        _harness.Should().NotBeNull();
+        var timeout = TimeSpan.FromSeconds(10);
+
+        // Inline listeners (no test-harness helpers needed)
+        var bus = apiApp.Services.GetRequiredService<IBus>();
+
+        //var authTcs = new TaskCompletionSource<ConsumeContext<Contracts.AuthUserCreated>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        //var learnerTcs = new TaskCompletionSource<ConsumeContext<Contracts.LearnerUserCreated>>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        //var authUserCreatedHandler = bus.ConnectHandler<Contracts.AuthUserCreated>(ctx =>
+        //{
+        //    authTcs.TrySetResult(ctx);
+        //    return Task.CompletedTask;
+        //});
+        //var learnerUserCreatedHandler = bus.ConnectHandler<Contracts.LearnerUserCreated>(ctx =>
+        //{
+        //    learnerTcs.TrySetResult(ctx);
+        //    return Task.CompletedTask;
+        //});
+        //var orderUserCreatedHandler = bus.ConnectHandler<Contracts.OrderUserCreated>(ctx =>
+        //{
+        //    orderTcs.TrySetResult(ctx);
+        //    return Task.CompletedTask;
+        //});
+
+        try
+        {
+            // Arrange + Act
+            var courseData = new
+            {
+                Title = "A great course",
+                Description = "You can learn a lot here, yes, I believe so. Yep. If you don't mind forking over 5 grand for some good education.",
+                Price = 4999_99 //cents
+            };
+
+            var courseDataJson = JsonConvert.SerializeObject(courseData);
+            var courseDataContent = new StringContent(courseDataJson, Encoding.UTF8, "application/json");
+
+            var response = await apiClient.PostAsync("/api/v1/courses", courseDataContent);
+            response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+            var body = await response.Content.ReadAsStringAsync();
+            var bodyObj = JsonConvert.DeserializeObject<JObject>(body)!;
+
+            var message = bodyObj["message"];
+            message.Should().NotBeNull("API should return a 'message' with aggregateId");
+
+            var aggregateIdText = message!["aggregateId"]?.Value<string>();
+            aggregateIdText.Should().NotBeNullOrWhiteSpace();
+            var aggregateId = Guid.Parse(aggregateIdText!);
+
+            // Await events
+            //var authEvt = await Wait(authTcs.Task, timeout);
+            //authEvt.Should().NotBeNull();
+
+            //var learnerEvt = await Wait(learnerTcs.Task, timeout);
+            //learnerEvt.Should().NotBeNull();
+
+            //var orderEvt = await Wait(orderTcs.Task, timeout);
+            //orderEvt.Should().NotBeNull();
+        }
+        finally
+        {
+            // Detach handlers so they don't leak to other tests
+            //authUserCreatedHandler.Disconnect();
+            //learnerUserCreatedHandler.Disconnect();
+            //orderUserCreatedHandler.Disconnect();
+        }
     }
 
     [Test]

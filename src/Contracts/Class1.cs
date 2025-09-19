@@ -34,3 +34,9 @@ public record LearnerUserCreated(Guid CorrelationId);
 public record CreateOrderUser(Guid CorrelationId, Guid aggregateId);
 
 public record OrderUserCreated(Guid CorrelationId);
+
+//Create Course
+
+public record CreateCourse(Guid AggregateId, string Title, string Description, int price);
+
+public record CreateCourseSagaStarted(Guid CorrelationId, Guid AggregateId, string Title, string Description, int price);

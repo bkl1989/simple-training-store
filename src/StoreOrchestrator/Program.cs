@@ -181,4 +181,72 @@ namespace StoreOrchestrator
                 ));
         }
     }
+
+    public class CreateCourseConsumer : IConsumer<Contracts.CreateCourse>
+    {
+        private readonly StoreOrchestratorDbContext _db;
+        //private readonly IRequestClient<Contracts.CreateAuthUser> _authUserRequestClient;
+        //private readonly IRequestClient<Contracts.CreateLearnerUser> _learnerUserRequestClient;
+        //private readonly IRequestClient<Contracts.CreateOrderUser> _orderUserRequestClient;
+
+        public CreateCourseConsumer(
+            StoreOrchestratorDbContext db
+            //IRequestClient<Contracts.CreateAuthUser> authUserRequestClient,
+            //IRequestClient<Contracts.CreateLearnerUser> learnerUserRequestClient,
+            //IRequestClient<Contracts.CreateOrderUser> orderUserRequestClient
+        )
+        {
+            _db = db;
+            //_authUserRequestClient = authUserRequestClient;
+            //_learnerUserRequestClient = learnerUserRequestClient;
+            //_orderUserRequestClient = orderUserRequestClient;
+        }
+        public async Task Consume(ConsumeContext<Contracts.CreateCourse> ctx)
+        {
+
+            // Ensure schema exists. Use MigrateAsync() if you rely on EF migrations.
+            await _db.Database.EnsureCreatedAsync();
+            //var anyUsers = await _db.StoreOrchestratorUsers.AnyAsync();
+
+            var createdSaga = new CreateCourseSaga
+            {
+                correlationId = Guid.NewGuid(),
+                aggregateId = Guid.NewGuid(),
+            };
+
+            // TODO: handle sad path
+            await _db.CreateCourseSagas.AddAsync(createdSaga);
+
+            await ctx.RespondAsync(new Contracts.CreateCourseSagaStarted(
+                createdSaga.correlationId,
+                createdSaga.aggregateId,
+                ctx.Message.Title,
+                ctx.Message.Description,
+                ctx.Message.price
+            ));
+
+            ////TODO: cancellation token
+            //_authUserRequestClient.GetResponse<Contracts.AuthUserCreated>(
+            //        new Contracts.CreateAuthUser(
+            //            createdSaga.correlationId,
+            //            ctx.Message.email,
+            //            ctx.Message.password,
+            //            createdSaga.aggregateId
+            //        ));
+
+            //_learnerUserRequestClient.GetResponse<Contracts.LearnerUserCreated>(
+            //        new Contracts.CreateLearnerUser(
+            //            createdSaga.correlationId,
+            //            ctx.Message.firstName,
+            //            ctx.Message.lastName,
+            //            createdSaga.aggregateId
+            //        ));
+
+            //_orderUserRequestClient.GetResponse<Contracts.OrderUserCreated>(
+            //    new Contracts.CreateOrderUser(
+            //        createdSaga.correlationId,
+            //        createdSaga.aggregateId
+            //    ));
+        }
+    }
 }

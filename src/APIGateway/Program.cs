@@ -17,6 +17,13 @@ namespace APIGateway
 
         [Required] public string Password { get; set; }
     }
+
+    public class CreateCourseDTO
+    {
+        [Required] public string Title { get; set; }
+        [Required] public string Description { get; set; }
+        [Required] public int Price { get; set; }
+    }
     public class Program
     {
         // ---- Entry point for production ----
@@ -55,7 +62,9 @@ namespace APIGateway
                 cfg.AddRequestClient<Contracts.AskForAuthServiceStatus>();
                 cfg.AddRequestClient<Contracts.AskForLearnerServiceStatus>();
                 cfg.AddRequestClient<Contracts.CreateUser>();
+                cfg.AddRequestClient<Contracts.CreateCourse>();
                 cfg.AddRequestClient<Contracts.CreateUserSagaStarted>();
+                cfg.AddRequestClient<Contracts.CreateCourseSagaStarted>();
 
                 cfg.UsingRabbitMq((context, cfg) =>
                 {
@@ -133,6 +142,21 @@ namespace APIGateway
                         user.LastName,
                         user.EmailAddress,
                         user.Password
+                    ), cts.Token);
+
+                return Results.Ok(response);
+            });
+
+            app.MapPost("/api/v1/courses",
+            async (CreateCourseDTO course, IRequestClient<Contracts.CreateCourse> client, CancellationToken ct) =>
+            {
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                var response = await client.GetResponse<Contracts.CreateCourseSagaStarted>(
+                    new Contracts.CreateCourse(
+                        Guid.NewGuid(),
+                        course.Title,
+                        course.Description,
+                        course.Price
                     ), cts.Token);
 
                 return Results.Ok(response);
