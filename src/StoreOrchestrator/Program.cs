@@ -83,6 +83,10 @@ namespace StoreOrchestrator
                     mt.AddRequestClient<Contracts.AuthUserCreated>();
                     mt.AddRequestClient<Contracts.CreateLearnerUser>();
                     mt.AddRequestClient<Contracts.LearnerUserCreated>();
+                    mt.AddRequestClient<Contracts.CreateOrderUser>();
+                    mt.AddRequestClient<Contracts.OrderUserCreated>();
+                    mt.AddRequestClient<Contracts.CreateLearnerCourse>();
+                    mt.AddRequestClient<Contracts.LearnerCourseCreated>();
 
                     mt.UsingRabbitMq((context, cfg) =>
                     {
@@ -185,19 +189,19 @@ namespace StoreOrchestrator
     public class CreateCourseConsumer : IConsumer<Contracts.CreateCourse>
     {
         private readonly StoreOrchestratorDbContext _db;
-        //private readonly IRequestClient<Contracts.CreateAuthUser> _authUserRequestClient;
+        private readonly IRequestClient<Contracts.CreateLearnerCourse> _learnerCourseRequestClient;
         //private readonly IRequestClient<Contracts.CreateLearnerUser> _learnerUserRequestClient;
         //private readonly IRequestClient<Contracts.CreateOrderUser> _orderUserRequestClient;
 
         public CreateCourseConsumer(
-            StoreOrchestratorDbContext db
-            //IRequestClient<Contracts.CreateAuthUser> authUserRequestClient,
+            StoreOrchestratorDbContext db,
+            IRequestClient<Contracts.CreateLearnerCourse> learnerCourseRequestClient
             //IRequestClient<Contracts.CreateLearnerUser> learnerUserRequestClient,
             //IRequestClient<Contracts.CreateOrderUser> orderUserRequestClient
         )
         {
             _db = db;
-            //_authUserRequestClient = authUserRequestClient;
+            _learnerCourseRequestClient = learnerCourseRequestClient;
             //_learnerUserRequestClient = learnerUserRequestClient;
             //_orderUserRequestClient = orderUserRequestClient;
         }
@@ -226,13 +230,13 @@ namespace StoreOrchestrator
             ));
 
             ////TODO: cancellation token
-            //_authUserRequestClient.GetResponse<Contracts.AuthUserCreated>(
-            //        new Contracts.CreateAuthUser(
-            //            createdSaga.correlationId,
-            //            ctx.Message.email,
-            //            ctx.Message.password,
-            //            createdSaga.aggregateId
-            //        ));
+            _learnerCourseRequestClient.GetResponse<Contracts.LearnerCourseCreated>(
+                    new Contracts.CreateLearnerCourse(
+                        createdSaga.correlationId,
+                        createdSaga.aggregateId,
+                        ctx.Message.Title,
+                        ctx.Message.Description
+                    ));
 
             //_learnerUserRequestClient.GetResponse<Contracts.LearnerUserCreated>(
             //        new Contracts.CreateLearnerUser(

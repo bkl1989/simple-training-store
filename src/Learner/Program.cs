@@ -11,7 +11,7 @@ namespace Learner {
             var host = CreateBuilder(args).Build();
 
             await using var scope = host.Services.CreateAsyncScope();
-            var context = scope.ServiceProvider.GetRequiredService<LearnerUserDbContext>();
+            var context = scope.ServiceProvider.GetRequiredService<LearnerDbContext>();
 
             await context.Database.CanConnectAsync();
 
@@ -25,7 +25,7 @@ namespace Learner {
         public static async Task SeedDevelopmentDatabase(IHost host)
         {
             await using var scope = host.Services.CreateAsyncScope();
-            var context = scope.ServiceProvider.GetRequiredService<LearnerUserDbContext>();
+            var context = scope.ServiceProvider.GetRequiredService<LearnerDbContext>();
 
             // Ensure schema exists. Use MigrateAsync() if you rely on EF migrations.
             await context.Database.EnsureCreatedAsync();
@@ -49,7 +49,7 @@ namespace Learner {
             var builder = Host.CreateDefaultBuilder(args).ConfigureServices((context, services) =>
             {
                 // Register DbContext directly
-                services.AddDbContext<LearnerUserDbContext>(options =>
+                services.AddDbContext<LearnerDbContext>(options =>
                     options.UseSqlServer(context.Configuration.GetConnectionString("LearnerDatabase"),
                         sqlServerOptionsAction: sqlOptions =>
                         {
@@ -83,8 +83,8 @@ namespace Learner {
 
     public sealed class AskLearnerServiceStatusConsumer : IConsumer<Contracts.AskForLearnerServiceStatus>
     {
-        private readonly LearnerUserDbContext _db;
-        public AskLearnerServiceStatusConsumer(LearnerUserDbContext db)
+        private readonly LearnerDbContext _db;
+        public AskLearnerServiceStatusConsumer(LearnerDbContext db)
         {
             _db = db;
         }
@@ -99,9 +99,9 @@ namespace Learner {
 
 public sealed class CreateLearnerUserConsumer : IConsumer<Contracts.CreateLearnerUser>
 {
-    private readonly LearnerUserDbContext _db;
+    private readonly LearnerDbContext _db;
 
-    public CreateLearnerUserConsumer(LearnerUserDbContext db)
+    public CreateLearnerUserConsumer(LearnerDbContext db)
     {
         _db = db;
     }
@@ -117,6 +117,30 @@ public sealed class CreateLearnerUserConsumer : IConsumer<Contracts.CreateLearne
 
         await ctx.RespondAsync(
             new Contracts.LearnerUserCreated(ctx.Message.CorrelationId)
+        );
+    }
+}
+
+public sealed class CreateLearnerCourseConsumer : IConsumer<Contracts.CreateLearnerCourse>
+{
+    private readonly LearnerDbContext _db;
+
+    public CreateLearnerCourseConsumer(LearnerDbContext db)
+    {
+        _db = db;
+    }
+
+    public async Task Consume(ConsumeContext<Contracts.CreateLearnerCourse> ctx)
+    {
+        await _db.LearnerCourses.AddAsync(new LearnerCourse
+        {
+            AggregateId = ctx.Message.AggregateId,
+            Title = ctx.Message.Title,
+            Description = ctx.Message.Description
+        });
+
+        await ctx.RespondAsync(
+            new Contracts.LearnerCourseCreated(ctx.Message.CorrelationId, ctx.Message.AggregateId)
         );
     }
 }

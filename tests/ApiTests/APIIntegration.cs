@@ -51,7 +51,7 @@ public class IntegrationTests
             services.AddDbContext<Auth.AuthUserDbContext>(o => o.UseSqlite(authConn));
             services.AddDbContext<StoreOrchestrator.StoreOrchestratorDbContext>(o => o.UseSqlite(orchestratorConn));
             services.AddDbContext<Order.OrderUserDbContext>(o => o.UseSqlite(orderConn));
-            services.AddDbContext<Learner.LearnerUserDbContext>(o => o.UseSqlite(learnerConn));
+            services.AddDbContext<Learner.LearnerDbContext>(o => o.UseSqlite(learnerConn));
         });
 
         apiAppBuilder.WebHost.UseTestServer();
@@ -59,15 +59,20 @@ public class IntegrationTests
         apiAppBuilder.Services.AddMassTransitTestHarness(cfg =>
         {
             cfg.AddConsumer<APIGateway.OrchestratorStatusConsumer>();
-            cfg.AddConsumer<AskStoreOrchestratorStatusConsumer>();
+            
+            //create user
             cfg.AddConsumer<CreateUserConsumer>();
             cfg.AddConsumer<CreateCourseConsumer>();
             cfg.AddConsumer<CreateAuthUserConsumer>();
             cfg.AddConsumer<CreateLearnerUserConsumer>();
             cfg.AddConsumer<CreateOrderUserConsumer>();
+            //create course
+            cfg.AddConsumer<CreateLearnerCourseConsumer>();
+            //ask status
             cfg.AddConsumer<AskOrderServiceStatusConsumer>();
             cfg.AddConsumer<AskAuthServiceStatusConsumer>();
             cfg.AddConsumer<AskLearnerServiceStatusConsumer>();
+            cfg.AddConsumer<AskStoreOrchestratorStatusConsumer>();
 
             cfg.AddRequestClient<Contracts.AskForOrchestratorStatus>();
             cfg.AddRequestClient<Contracts.AskForOrderServiceStatus>();
@@ -98,7 +103,7 @@ public class IntegrationTests
         await using (var scope = apiApp.Services.CreateAsyncScope())
             await scope.ServiceProvider.GetRequiredService<Order.OrderUserDbContext>().Database.EnsureCreatedAsync();
         await using (var scope = apiApp.Services.CreateAsyncScope())
-            await scope.ServiceProvider.GetRequiredService<Learner.LearnerUserDbContext>().Database.EnsureCreatedAsync();
+            await scope.ServiceProvider.GetRequiredService<Learner.LearnerDbContext>().Database.EnsureCreatedAsync();
 
         // Seed
         await Auth.Program.SeedDevelopmentDatabase(apiApp);
@@ -123,14 +128,14 @@ public class IntegrationTests
         // Inline listeners (no test-harness helpers needed)
         var bus = apiApp.Services.GetRequiredService<IBus>();
 
-        //var authTcs = new TaskCompletionSource<ConsumeContext<Contracts.AuthUserCreated>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var learnerTcs = new TaskCompletionSource<ConsumeContext<Contracts.LearnerCourseCreated>>(TaskCreationOptions.RunContinuationsAsynchronously);
         //var learnerTcs = new TaskCompletionSource<ConsumeContext<Contracts.LearnerUserCreated>>(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        //var authUserCreatedHandler = bus.ConnectHandler<Contracts.AuthUserCreated>(ctx =>
-        //{
-        //    authTcs.TrySetResult(ctx);
-        //    return Task.CompletedTask;
-        //});
+        var learnerCourseCreatedHandler = bus.ConnectHandler<Contracts.LearnerCourseCreated>(ctx =>
+        {
+            learnerTcs.TrySetResult(ctx);
+            return Task.CompletedTask;
+        });
         //var learnerUserCreatedHandler = bus.ConnectHandler<Contracts.LearnerUserCreated>(ctx =>
         //{
         //    learnerTcs.TrySetResult(ctx);
@@ -169,8 +174,8 @@ public class IntegrationTests
             var aggregateId = Guid.Parse(aggregateIdText!);
 
             // Await events
-            //var authEvt = await Wait(authTcs.Task, timeout);
-            //authEvt.Should().NotBeNull();
+            var authEvt = await Wait(learnerTcs.Task, timeout);
+            authEvt.Should().NotBeNull();
 
             //var learnerEvt = await Wait(learnerTcs.Task, timeout);
             //learnerEvt.Should().NotBeNull();
@@ -181,7 +186,7 @@ public class IntegrationTests
         finally
         {
             // Detach handlers so they don't leak to other tests
-            //authUserCreatedHandler.Disconnect();
+            learnerCourseCreatedHandler.Disconnect();
             //learnerUserCreatedHandler.Disconnect();
             //orderUserCreatedHandler.Disconnect();
         }

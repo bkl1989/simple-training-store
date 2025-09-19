@@ -8,8 +8,9 @@ using System.Reflection.Metadata;
 
 namespace Learner
 {
-    public class LearnerUserDbContext(DbContextOptions<LearnerUserDbContext> options) : DbContext(options)
+    public class LearnerDbContext(DbContextOptions<LearnerDbContext> options) : DbContext(options)
     {
         public DbSet<LearnerUser> LearnerUsers => Set<LearnerUser>();
+        public DbSet<LearnerCourse> LearnerCourses => Set<LearnerCourse>();
     }
 }
