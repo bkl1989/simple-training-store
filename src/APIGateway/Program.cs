@@ -1,12 +1,14 @@
-using System;
-using System.ComponentModel.DataAnnotations;
-using System.Threading;
-using System.Threading.Tasks;
 using Auth;
 using MassTransit;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using System;
+using System.ComponentModel.DataAnnotations;
+using System.Net.Http.Headers;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace APIGateway
 {
@@ -196,18 +198,35 @@ namespace APIGateway
             });
 
             app.MapPost("/api/v1/orders",
-            async (OrderDTO order, IRequestClient<Contracts.CreateOrder> client, CancellationToken ct) =>
+            async (HttpContext httpContext, OrderDTO order, IRequestClient<Contracts.CreateOrder> client, CancellationToken ct) =>
             {
-                string JWTToken = "";
+                string? jwt = null;
+                var authHeader = httpContext.Request.Headers.Authorization.ToString();
+                if (AuthenticationHeaderValue.TryParse(authHeader, out var h) &&
+                    string.Equals(h.Scheme, "Bearer", StringComparison.OrdinalIgnoreCase))
+                {
+                    jwt = h.Parameter; // raw token
+                }
+
+                //TODO: use dependency injection
+                TokenService decoder = new TokenService();
+                DecodedToken credentials = decoder.DecodeToken(jwt);
+
+                if (credentials.Username == null)
+                {
+                    return Results.Unauthorized();
+                }
 
                 using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
                 var response = await client.GetResponse<Contracts.CreateOrderSagaStarted>(
                     new Contracts.CreateOrder(
                         Guid.NewGuid(),
                         Guid.NewGuid(),
-                        JWTToken,
+                        jwt,
                         order.CourseIds
                     ), cts.Token);
+
+                return Results.Ok(response);
             });
 
             return app;

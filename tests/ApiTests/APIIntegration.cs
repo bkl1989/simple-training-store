@@ -1,5 +1,6 @@
 using APIGateway;
 using Auth;
+using Azure;
 using Contracts;
 using FluentAssertions;
 using Learner;
@@ -20,8 +21,11 @@ using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
 using System.Text;
 using System.Threading.Tasks;
+using static Microsoft.Azure.Amqp.CbsConstants;
 
 namespace ApiTests;
 
@@ -290,20 +294,44 @@ public class IntegrationTests
         }
     }
 
-    //[Test]
-    //public async Task CreatesOrder()
-    //{
-    //    var authenticationData = new
-    //    {
-    //        Username = "me@test.com",
-    //        Password = "9r$s0gn#20a!"
-    //    };
+    [Test]
+    public async Task CreatesOrder()
+    {
+        var authenticationData = new
+        {
+            Username = "me@test.com",
+            Password = "9r$s0gn#20a!"
+        };
 
-    //    var authenticationDataJson = JsonConvert.SerializeObject(authenticationData);
-    //    var authenticationDataContent = new StringContent(authenticationDataJson, Encoding.UTF8, "application/json");
-    //    var authenticationResponse = await apiClient.PostAsync("/api/v1/auth", authenticationDataContent);
-    //    authenticationResponse.StatusCode.Should().Be(HttpStatusCode.OK);
-    //}
+        var authenticationDataJson = JsonConvert.SerializeObject(authenticationData);
+        var authenticationDataContent = new StringContent(authenticationDataJson, Encoding.UTF8, "application/json");
+        var authenticationResponse = await apiClient.PostAsync("/api/v1/auth", authenticationDataContent);
+        authenticationResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var body = await authenticationResponse.Content.ReadAsStringAsync();
+        var bodyObj = JsonConvert.DeserializeObject<JObject>(body)!;
+        var message = bodyObj["message"]!;
+        string token = (string)message["token"]!;
+        //TODO: user dependency injection
+        TokenService decoder = new TokenService();
+        string usernameFromToken = decoder.DecodeToken(token).Username;
+        usernameFromToken.Should().NotBeNullOrEmpty();
+
+        var createCourseData = new
+        {
+            courses = (Guid [])[Guid.Empty]
+        };
+        var userDataJson = JsonConvert.SerializeObject(createCourseData);
+        var userDataContent = new StringContent(userDataJson, Encoding.UTF8, "application/json");
+
+        var req = new HttpRequestMessage(HttpMethod.Post, "/api/v1/orders")
+        {
+            Content = JsonContent.Create(createCourseData)
+        };
+        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token); // <-- set token in header
+
+        var response = await apiClient.SendAsync(req);
+    }
 
     [Test]
     public async Task APIGatewayStatusCheck()

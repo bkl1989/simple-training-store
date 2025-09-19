@@ -15,6 +15,8 @@ namespace Auth
     {
         string BuildToken(string key, string issuer, IEnumerable<string> audience, string userName);
     }
+
+    public record DecodedToken (string Username);
     public class TokenService : ITokenService
     {
         private TimeSpan ExpiryDuration = new TimeSpan(0, 30, 0);
@@ -42,6 +44,34 @@ namespace Auth
             var tokenDescriptor = new JwtSecurityToken(issuer, issuer, claims,
                 expires: DateTime.Now.Add(ExpiryDuration), signingCredentials: credentials);
             return new JwtSecurityTokenHandler().WriteToken(tokenDescriptor);
+        }
+
+        public DecodedToken DecodeToken (string token)
+        {
+            string issuer = "360training.com";
+            var keyBytes = Encoding.UTF8.GetBytes(getJWTKey()); // HS256 secret
+            var signingKey = new SymmetricSecurityKey(keyBytes);
+
+            var parameters = new TokenValidationParameters
+            {
+                ValidateIssuerSigningKey = true,
+                IssuerSigningKey = signingKey,
+
+                ValidateIssuer = true,
+                ValidIssuer = issuer,
+
+                ValidateAudience = true,
+                ValidAudiences = new[] { "360training.com" },
+
+                ValidateLifetime = true,
+                ClockSkew = TimeSpan.FromMinutes(1)
+            };
+
+            var handler = new JwtSecurityTokenHandler();
+            ClaimsPrincipal principal = handler.ValidateToken(token, parameters, out var validated);
+            string? userName = principal.FindFirst(JwtRegisteredClaimNames.UniqueName)?.Value!;
+
+            return new DecodedToken(principal.Identity.Name);
         }
     }
 
