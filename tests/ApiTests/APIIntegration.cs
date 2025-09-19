@@ -77,6 +77,8 @@ public class IntegrationTests
             cfg.AddConsumer<CreateLearnerCourseConsumer>();
             cfg.AddConsumer<CreateCourseConsumer>();
             cfg.AddConsumer<CreateOrderCourseConsumer>();
+            //create order
+            cfg.AddConsumer<CreateOrderConsumer>();
             //ask status
             cfg.AddConsumer<AskOrderServiceStatusConsumer>();
             cfg.AddConsumer<AskAuthServiceStatusConsumer>();

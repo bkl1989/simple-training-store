@@ -57,8 +57,6 @@ namespace Order {
                         }
                     )
                 );
-                // Keep your worker (optional)
-                services.AddHostedService<Order.Worker>();
 
                 // MassTransit: respond to AskForOrderServiceStatus
                 services.AddMassTransit(mt =>

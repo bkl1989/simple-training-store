@@ -171,7 +171,7 @@ namespace Auth
                                         {
                                             "360training.com"
                                         },
-                                        ctx.Message.Username);
+                                        userForEmail.AggregateId.ToString());
             }
 
 

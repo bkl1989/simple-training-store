@@ -51,9 +51,9 @@ public record OrderCourseCreated(Guid CorrelationId, Guid AggregateId);
 
 //Create Order
 
-public record CreateOrder(Guid CorrelationId, Guid AggregateId, string JwtToken, Guid[] courses);
+public record CreateOrder(Guid CorrelationId, Guid AggregateId, string JwtToken, Guid[] CourseIds);
 
-public record CreateOrderSagaStarted(Guid CorrelationId, Guid AggregateId, bool paymentApproved, Guid UserAggregateId, Guid[] courseIds);
+public record CreateOrderSagaStarted(Guid CorrelationId, Guid AggregateId, bool paymentApproved, Guid UserAggregateId, Guid[] CourseIds);
 
 //Authentication
 

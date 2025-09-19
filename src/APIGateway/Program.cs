@@ -80,9 +80,14 @@ namespace APIGateway
                 //create user
                 cfg.AddRequestClient<Contracts.CreateUser>();
                 cfg.AddRequestClient<Contracts.CreateUserSagaStarted>();
+                //create order
+                cfg.AddRequestClient<Contracts.CreateOrder>();
+                cfg.AddRequestClient<Contracts.CreateOrderSagaStarted>();
                 //create course
                 cfg.AddRequestClient<Contracts.CreateCourse>();
                 cfg.AddRequestClient<Contracts.CreateCourseSagaStarted>();
+
+
                 //authenticate
                 cfg.AddRequestClient<Contracts.ValidateCredentials>();
                 cfg.AddRequestClient<Contracts.CredentialsWereValidated>();

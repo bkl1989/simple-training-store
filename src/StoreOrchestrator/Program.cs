@@ -1,3 +1,4 @@
+using Auth;
 using k8s.KubeConfigModels;
 using MassTransit;
 using MassTransit.Caching.Internals;
@@ -246,20 +247,83 @@ namespace StoreOrchestrator
                 ctx.Message.Title,
                 ctx.Message.price
             ));
+        }
+    }
 
-            //_learnerUserRequestClient.GetResponse<Contracts.LearnerUserCreated>(
-            //        new Contracts.CreateLearnerUser(
+    public class CreateOrderConsumer : IConsumer<Contracts.CreateOrder>
+    {
+        private readonly StoreOrchestratorDbContext _db;
+        //private readonly IRequestClient<Contracts.CreateLearnerCourse> _learnerCourseRequestClient;
+        //private readonly IRequestClient<Contracts.CreateOrderCourse> _orderCourseRequestClient;
+
+        public CreateOrderConsumer(
+            StoreOrchestratorDbContext db
+            //IRequestClient<Contracts.CreateLearnerCourse> learnerCourseRequestClient,
+            //IRequestClient<Contracts.CreateOrderCourse> orderCourseRequestClient
+        )
+        {
+            _db = db;
+            //_learnerCourseRequestClient = learnerCourseRequestClient;
+            //_orderCourseRequestClient = orderCourseRequestClient;
+        }
+        public async Task Consume(ConsumeContext<Contracts.CreateOrder> ctx)
+        {
+
+            // Ensure schema exists. Use MigrateAsync() if you rely on EF migrations.
+            await _db.Database.EnsureCreatedAsync();
+            //var anyUsers = await _db.StoreOrchestratorUsers.AnyAsync();
+
+            //var createdSaga = new CreateCourseSaga
+            //{
+            //    correlationId = Guid.NewGuid(),
+            //    aggregateId = Guid.NewGuid(),
+            //};
+
+            // TODO: handle sad path
+            //await _db.CreateCourseSagas.AddAsync(createdSaga);
+
+            var JWTToken = ctx.Message.JwtToken;
+            TokenService decoder = new TokenService();
+            DecodedToken decoded = decoder.DecodeToken(JWTToken);
+
+            if (decoded.Username == null)
+            {
+                await ctx.RespondAsync(new Contracts.CreateOrderSagaStarted(
+                    ctx.Message.CorrelationId,
+                    ctx.Message.AggregateId,
+                    //TODO: 
+                    false,
+                    Guid.Empty,
+                    ctx.Message.CourseIds
+                ));
+                return;
+            }
+
+            await ctx.RespondAsync(new Contracts.CreateOrderSagaStarted(
+                ctx.Message.CorrelationId,
+                ctx.Message.AggregateId,
+                //TODO: 
+                true,
+                Guid.Parse(decoded.Username),
+                ctx.Message.CourseIds
+            ));
+
+            ////TODO: cancellation token
+            //_learnerCourseRequestClient.GetResponse<Contracts.LearnerCourseCreated>(
+            //        new Contracts.CreateLearnerCourse(
             //            createdSaga.correlationId,
-            //            ctx.Message.firstName,
-            //            ctx.Message.lastName,
-            //            createdSaga.aggregateId
+            //            createdSaga.aggregateId,
+            //            ctx.Message.Title,
+            //            ctx.Message.Description
             //        ));
 
-            //_orderUserRequestClient.GetResponse<Contracts.OrderUserCreated>(
-            //    new Contracts.CreateOrderUser(
-            //        createdSaga.correlationId,
-            //        createdSaga.aggregateId
-            //    ));
+            //_orderCourseRequestClient.GetResponse<Contracts.OrderCourseCreated>(
+            //new Contracts.CreateOrderCourse(
+            //    createdSaga.correlationId,
+            //    createdSaga.aggregateId,
+            //    ctx.Message.Title,
+            //    ctx.Message.price
+            //));
         }
     }
 }
