@@ -77,40 +77,42 @@ namespace Auth
 
         public static async Task SeedDevelopmentDatabase(IHost host)
         {
-            await using var scope = host.Services.CreateAsyncScope();
-            var context = scope.ServiceProvider.GetRequiredService<AuthDbContext>();
+            //Seeding the development database in this way is deprecated and will be removed
 
-            // Ensure schema exists. Use MigrateAsync() if you rely on EF migrations.
-            await context.Database.EnsureCreatedAsync();
+            //await using var scope = host.Services.CreateAsyncScope();
+            //var context = scope.ServiceProvider.GetRequiredService<AuthDbContext>();
 
-            if (!await context.AuthUsers.AnyAsync())
-            {
-                const string password = "123Password";
+            //// Ensure schema exists. Use MigrateAsync() if you rely on EF migrations.
+            //await context.Database.EnsureCreatedAsync();
 
-                // Generate a salt
-                byte[] salt = RandomNumberGenerator.GetBytes(16);
+            //if (!await context.AuthUsers.AnyAsync())
+            //{
+            //    const string password = "123Password";
 
-                // Derive a key from the password + salt using PBKDF2
-                using var pbkdf2 = new Rfc2898DeriveBytes(
-                    password,
-                    salt,
-                    iterations: 100_000,
-                    HashAlgorithmName.SHA256);
+            //    // Generate a salt
+            //    byte[] salt = RandomNumberGenerator.GetBytes(16);
 
-                byte[] hash = pbkdf2.GetBytes(32);
+            //    // Derive a key from the password + salt using PBKDF2
+            //    using var pbkdf2 = new Rfc2898DeriveBytes(
+            //        password,
+            //        salt,
+            //        iterations: 100_000,
+            //        HashAlgorithmName.SHA256);
 
-                Guid aggregateId = Guid.Empty;
+            //    byte[] hash = pbkdf2.GetBytes(32);
 
-                context.AuthUsers.Add(new AuthUser
-                {
-                    EmailAddress = "bkl1989@gmail.com",
-                    HashedPassword = hash,
-                    Salt = salt,
-                    AggregateId = aggregateId
-                });
+            //    Guid aggregateId = Guid.Empty;
 
-                await context.SaveChangesAsync();
-            }
+            //    context.AuthUsers.Add(new AuthUser
+            //    {
+            //        EmailAddress = "bkl1989@gmail.com",
+            //        HashedPassword = hash,
+            //        Salt = salt,
+            //        AggregateId = aggregateId
+            //    });
+
+            //    await context.SaveChangesAsync();
+            //}
         }
     }
 

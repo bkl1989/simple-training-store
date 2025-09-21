@@ -309,13 +309,15 @@ namespace StoreOrchestrator
             ));
 
             ////TODO: cancellation token
-            _processOrderRequestClient.GetResponse<Contracts.OrderProcessed>(
+            var orderProcessedResponse = await _processOrderRequestClient.GetResponse<Contracts.OrderProcessed>(
                     new Contracts.ProcessOrder(
                         ctx.Message.CorrelationId,
                         ctx.Message.AggregateId,
                         JWTToken,
                         ctx.Message.CourseIds
                     ));
+
+            Contracts.OrderProcessed orderProcessedData = orderProcessedResponse.Message;
 
             //_orderCourseRequestClient.GetResponse<Contracts.OrderCourseCreated>(
             //new Contracts.CreateOrderCourse(
