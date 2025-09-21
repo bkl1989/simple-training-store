@@ -24,24 +24,24 @@ namespace Learner {
         }
         public static async Task SeedDevelopmentDatabase(IHost host)
         {
-            await using var scope = host.Services.CreateAsyncScope();
-            var context = scope.ServiceProvider.GetRequiredService<LearnerDbContext>();
+            //await using var scope = host.Services.CreateAsyncScope();
+            //var context = scope.ServiceProvider.GetRequiredService<LearnerDbContext>();
 
-            // Ensure schema exists. Use MigrateAsync() if you rely on EF migrations.
-            await context.Database.EnsureCreatedAsync();
-            var anyUsers = await context.LearnerUsers.AnyAsync();
+            //// Ensure schema exists. Use MigrateAsync() if you rely on EF migrations.
+            //await context.Database.EnsureCreatedAsync();
+            //var anyUsers = await context.LearnerUsers.AnyAsync();
 
-            if (!anyUsers)
-            {
+            //if (!anyUsers)
+            //{
 
-                context.LearnerUsers.Add(new LearnerUser
-                {
-                    FirstName = "John",
-                    LastName = "Test"
-                });
+            //    context.LearnerUsers.Add(new LearnerUser
+            //    {
+            //        FirstName = "John",
+            //        LastName = "Test"
+            //    });
 
-                await context.SaveChangesAsync();
-            }
+            //    await context.SaveChangesAsync();
+            //}
         }
 
         public static IHostBuilder CreateBuilder(string[] args)
