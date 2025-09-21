@@ -120,12 +120,6 @@ public class IntegrationTests
         await using (var scope = apiApp.Services.CreateAsyncScope())
             await scope.ServiceProvider.GetRequiredService<Learner.LearnerDbContext>().Database.EnsureCreatedAsync();
 
-        // Seed
-        await Auth.Program.SeedDevelopmentDatabase(apiApp);
-        await StoreOrchestrator.Program.SeedDevelopmentDatabase(apiApp);
-        await Order.Program.SeedDevelopmentDatabase(apiApp);
-        await Learner.Program.SeedDevelopmentDatabase(apiApp);
-
         await apiApp.StartAsync();
 
         _harness = apiApp.Services.GetRequiredService<ITestHarness>();

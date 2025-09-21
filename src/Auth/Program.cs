@@ -30,12 +30,6 @@ namespace Auth
 
             // Ensure schema exists. Use MigrateAsync() if you rely on EF migrations.
             await context.Database.CanConnectAsync();
-            //TODO: handle error
-
-            if (host.Services.GetRequiredService<IHostEnvironment>().IsDevelopment())
-            {
-                await SeedDevelopmentDatabase(host);
-            }
 
             await host.RunAsync();
         }
@@ -74,46 +68,6 @@ namespace Auth
                         });
                     });
                 });
-
-        public static async Task SeedDevelopmentDatabase(IHost host)
-        {
-            //Seeding the development database in this way is deprecated and will be removed
-
-            //await using var scope = host.Services.CreateAsyncScope();
-            //var context = scope.ServiceProvider.GetRequiredService<AuthDbContext>();
-
-            //// Ensure schema exists. Use MigrateAsync() if you rely on EF migrations.
-            //await context.Database.EnsureCreatedAsync();
-
-            //if (!await context.AuthUsers.AnyAsync())
-            //{
-            //    const string password = "123Password";
-
-            //    // Generate a salt
-            //    byte[] salt = RandomNumberGenerator.GetBytes(16);
-
-            //    // Derive a key from the password + salt using PBKDF2
-            //    using var pbkdf2 = new Rfc2898DeriveBytes(
-            //        password,
-            //        salt,
-            //        iterations: 100_000,
-            //        HashAlgorithmName.SHA256);
-
-            //    byte[] hash = pbkdf2.GetBytes(32);
-
-            //    Guid aggregateId = Guid.Empty;
-
-            //    context.AuthUsers.Add(new AuthUser
-            //    {
-            //        EmailAddress = "bkl1989@gmail.com",
-            //        HashedPassword = hash,
-            //        Salt = salt,
-            //        AggregateId = aggregateId
-            //    });
-
-            //    await context.SaveChangesAsync();
-            //}
-        }
     }
 
     public sealed class AskAuthServiceStatusConsumer : IConsumer<Contracts.AskForAuthServiceStatus>

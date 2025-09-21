@@ -25,35 +25,7 @@ namespace StoreOrchestrator
 
             await context.Database.CanConnectAsync();
 
-            if (host.Services.GetRequiredService<IHostEnvironment>().IsDevelopment())
-            {
-                await SeedDevelopmentDatabase(host);
-            }
-
             host.Run();
-        }
-
-        public static async Task SeedDevelopmentDatabase(IHost host)
-        {
-            await using var scope = host.Services.CreateAsyncScope();
-            var context = scope.ServiceProvider.GetRequiredService<StoreOrchestratorDbContext>();
-
-            // Ensure schema exists. Use MigrateAsync() if you rely on EF migrations.
-            await context.Database.EnsureCreatedAsync();
-            var anyUsers = await context.StoreOrchestratorUsers.AnyAsync();
-
-            if (!anyUsers)
-            {
-                //a predictable encryption key (all 0) for development testing
-                byte[] key = new byte[32];
-
-                context.StoreOrchestratorUsers.Add(new StoreOrchestratorUser
-                {
-                    EncryptionKey = key
-                });
-
-                await context.SaveChangesAsync();
-            }
         }
 
         //TODO: is this the correct form, rather than IHostBuilder, for similar instances?

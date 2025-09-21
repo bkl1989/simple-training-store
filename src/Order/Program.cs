@@ -16,33 +16,7 @@ namespace Order {
 
             await context.Database.CanConnectAsync();
 
-            if (host.Services.GetRequiredService<IHostEnvironment>().IsDevelopment())
-            {
-                await SeedDevelopmentDatabase(host);
-            }
-
             host.Run();
-        }
-
-        public static async Task SeedDevelopmentDatabase(IHost host)
-        {
-            //await using var scope = host.Services.CreateAsyncScope();
-            //var context = scope.ServiceProvider.GetRequiredService<OrderDbContext>();
-
-            //// Ensure schema exists. Use MigrateAsync() if you rely on EF migrations.
-            //await context.Database.EnsureCreatedAsync();
-            //var anyUsers = await context.OrderUsers.AnyAsync();
-
-            //if (!anyUsers)
-            //{
-
-            //    context.OrderUsers.Add(new OrderUser
-            //    {
-            //        AggregateId = Guid.Empty
-            //    });
-
-            //    await context.SaveChangesAsync();
-            //}
         }
 
         public static IHostBuilder CreateBuilder(string[] args)
