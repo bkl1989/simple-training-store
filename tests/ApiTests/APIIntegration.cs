@@ -35,6 +35,10 @@ public class IntegrationTests
     private WebApplication apiApp = null!;
     private HttpClient apiClient = null!;
     private ITestHarness? _harness;
+    private Guid seedUserId = Guid.Empty;
+    private Guid seedCourseId = Guid.Empty;
+    private string seedUserPassword = Guid.NewGuid().ToString();
+    private string seedUserUsername = "me@test.com";
 
     [OneTimeSetUp]
     public async Task OneTimeSetUp()
@@ -127,18 +131,49 @@ public class IntegrationTests
 
         apiClient = apiApp.GetTestClient();
 
-        var userData = new
+        /*
+         *  Seed a test user
+         */
+
+        var seedUserData = new
         {
             FirstName = "John",
             LastName = "Test",
-            EmailAddress = "me@test.com",
-            Password = "9r$s0gn#20a!"
+            EmailAddress = seedUserUsername,
+            Password = seedUserPassword
         };
 
-        var userDataJson = JsonConvert.SerializeObject(userData);
+        var userDataJson = JsonConvert.SerializeObject(seedUserData);
         var userDataContent = new StringContent(userDataJson, Encoding.UTF8, "application/json");
 
-        var response = await apiClient.PostAsync("/api/v1/users", userDataContent);
+        var userResponse = await apiClient.PostAsync("/api/v1/users", userDataContent);
+
+        var userBody = await userResponse.Content.ReadAsStringAsync();
+        var userBodyObj = JsonConvert.DeserializeObject<JObject>(userBody);
+
+        var userMessage = userBodyObj["message"];
+
+        seedUserId = Guid.Parse(userBodyObj["message"]["aggregateId"].ToString());
+        /*
+         *  Seed a test course
+         */
+
+        var seedCourseData = new
+        {
+            Title = "A great course",
+            Description = "You can learn a lot here, yes, I believe so. Yep. If you don't mind forking over 5 grand for some good education.",
+            Price = 4999_99 //cents
+        };
+
+        var courseDataJson = JsonConvert.SerializeObject(seedCourseData);
+        var courseDataContent = new StringContent(courseDataJson, Encoding.UTF8, "application/json");
+
+        var courseResponse = await apiClient.PostAsync("/api/v1/courses", courseDataContent);
+
+        var courseBody = await courseResponse.Content.ReadAsStringAsync();
+        var courseBodyObj = JsonConvert.DeserializeObject<JObject>(courseBody)!;
+
+        seedCourseId = Guid.Parse(courseBodyObj["message"]["aggregateId"].ToString());
     }
 
     [Test]
@@ -306,8 +341,8 @@ public class IntegrationTests
 
         var authenticationData = new
         {
-            Username = "me@test.com",
-            Password = "9r$s0gn#20a!"
+            Username = seedUserUsername,
+            Password = seedUserPassword
         };
 
         var authenticationDataJson = JsonConvert.SerializeObject(authenticationData);
@@ -326,7 +361,7 @@ public class IntegrationTests
 
         var createCourseData = new
         {
-            CourseIds = (Guid [])[Guid.Empty]
+            CourseIds = (Guid [])[seedCourseId]
         };
         var userDataJson = JsonConvert.SerializeObject(createCourseData);
         var userDataContent = new StringContent(userDataJson, Encoding.UTF8, "application/json");
